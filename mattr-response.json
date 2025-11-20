@@ -3,7 +3,7 @@
         {
             "docType": "urn:eudi:pid:1",
             "issuerInfo": {
-                "commonName": "digital-credentials.dev"
+                "commonName": "digital-credentialss.dev"
             },
             "validityInfo": {
                 "signed": "2023-05-02T04:00:00.000Z",

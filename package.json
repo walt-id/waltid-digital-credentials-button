@@ -1,5 +1,5 @@
 {
-  "name": "@waltid/digital-credential-wc",
+  "name": "@waltid/digital-credentials-wc",
   "version": "0.1.0",
   "description": "Web Component to trigger Digital Credential API requests and forward results to a backend.",
   "type": "module",
@@ -21,10 +21,10 @@
     "preview": "vite preview"
   },
   "keywords": [
-    "digital-credentials",
+    "digital-credentialss",
     "wallet",
     "web-component",
-    "digital-credential-api",
+    "digital-credentials-api",
     "web-authn"
   ],
   "author": "walt.id",

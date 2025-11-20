@@ -7,26 +7,26 @@ A tiny Web Component that fetches a Digital Credential API request from your bac
 Install (after publishing):
 
 ```bash
-npm install @waltid/digital-credential-wc
+npm install @waltid/digital-credentials-wc
 ```
 
 Register the component and drop it into your page:
 
 ```html
 <script type="module">
-  import '@waltid/digital-credential-wc';
+  import '@waltid/digital-credentials-wc';
 </script>
 
-<digital-credential-button
+<digital-credentials-button
   config-endpoint="/api/dc/config"
   label="Request credentials"
-></digital-credential-button>
+></digital-credentials-button>
 ```
 
 Listen for lifecycle events:
 
 ```js
-const el = document.querySelector('digital-credential-button');
+const el = document.querySelector('digital-credentials-button');
 el.addEventListener('credential-request-started', () => console.log('started'));
 el.addEventListener('credential-received', (event) => console.log('success', event.detail));
 el.addEventListener('credential-error', (event) => console.error('error', event.detail));
@@ -52,7 +52,7 @@ el.addEventListener('credential-error', (event) => console.error('error', event.
 ## Local development
 
 ```
-cd digital-credential-button
+cd digital-credentials-button
 npm install
 npm run build
 npm run dev

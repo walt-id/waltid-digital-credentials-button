@@ -8,7 +8,7 @@ I’ll phrase it as a **single, self-contained prompt** with clear requirements 
 
 ### 1. Goal
 
-Implement a reusable **Web Component** (custom element) in **TypeScript** called `<digital-credential-button>` that:
+Implement a reusable **Web Component** (custom element) in **TypeScript** called `<digital-credentials-button>` that:
 
 1. Renders a **“Request credentials”** button (label customizable via attribute).
 2. On click:
@@ -33,10 +33,10 @@ Focus on a clean, minimal implementation that is easy to understand and extend.
   * ESM bundle suitable for import via:
 
     ```ts
-    import '@waltid/digital-credential-wc';
+    import '@waltid/digital-credentials-wc';
     ```
   * Also usable directly via `<script type="module" …>` from a CDN.
-* Package name (for now): `@waltid/digital-credential-wc` (configure `package.json` accordingly).
+* Package name (for now): `@waltid/digital-credentials-wc` (configure `package.json` accordingly).
 
 **Tasks:**
 
@@ -44,7 +44,7 @@ Focus on a clean, minimal implementation that is easy to understand and extend.
 
    ```
    /src
-     digital-credential-button.ts
+     digital-credentials-button.ts
      index.ts
    package.json
    tsconfig.json
@@ -56,7 +56,7 @@ Focus on a clean, minimal implementation that is easy to understand and extend.
 
 ### 3. Custom Element API
 
-Implement a custom element named: **`digital-credential-button`**.
+Implement a custom element named: **`digital-credentials-button`**.
 
 #### 3.1. Attributes / Properties
 
@@ -78,16 +78,16 @@ The component must support:
 All attributes should be reflected to internal state and usable as DOM attributes:
 
 ```html
-<digital-credential-button
+<digital-credentials-button
   config-endpoint="/api/dc/config"
   label="Connect my wallet"
-></digital-credential-button>
+></digital-credentials-button>
 ```
 
 Also support **setting via properties** on the element instance:
 
 ```ts
-const btn = document.querySelector('digital-credential-button');
+const btn = document.querySelector('digital-credentials-button');
 btn.configEndpoint = '/api/dc/config';
 btn.label = 'Request credentials';
 ```
@@ -119,7 +119,7 @@ The component must dispatch **CustomEvents** on the element itself:
 Example usage:
 
 ```js
-const el = document.querySelector('digital-credential-button');
+const el = document.querySelector('digital-credentials-button');
 
 el.addEventListener('credential-received', (e) => {
   console.log('Credential flow success', e.detail);
@@ -285,11 +285,11 @@ Example demo markup:
   </head>
   <body>
     <h1>Digital Credential Button Demo</h1>
-    <digital-credential-button
+    <digital-credentials-button
       id="dc-btn"
       config-endpoint="/api/dc/config"
       label="Request credentials"
-    ></digital-credential-button>
+    ></digital-credentials-button>
 
     <script type="module">
       const btn = document.getElementById('dc-btn');
@@ -316,10 +316,10 @@ The task is complete when:
 2. Importing the library via:
 
    ```ts
-   import '@waltid/digital-credential-wc';
+   import '@waltid/digital-credentials-wc';
    ```
 
-   registers `<digital-credential-button>` as a custom element.
+   registers `<digital-credentials-button>` as a custom element.
 3. Using the component in a plain HTML page:
 
    * Show a visible button.
