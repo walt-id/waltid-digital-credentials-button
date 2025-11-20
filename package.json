@@ -1,36 +1,18 @@
 {
-  "name": "@waltid/digital-credentials",
+  "name": "digital-credentials-button-monorepo",
   "version": "0.1.0",
-  "description": "Web Component to trigger Digital Credential API requests and forward results to a backend.",
-  "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/types/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/types/index.d.ts"
-    }
-  },
-  "files": [
-    "dist"
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
-    "build": "vite build && tsc -p tsconfig.build.json",
-    "dev": "vite dev --host",
-    "preview": "vite preview"
-  },
-  "keywords": [
-    "digital-credentialss",
-    "wallet",
-    "web-component",
-    "digital-credentials-api",
-    "web-authn"
-  ],
-  "author": "walt.id",
-  "license": "Apache-2.0",
-  "devDependencies": {
-    "typescript": "^5.4.0",
-    "vite": "^7.2.4"
+    "build": "npm run build:mocks && npm run build:wc",
+    "build:mocks": "npm run build --workspace packages/dc-mock-utils",
+    "build:wc": "npm run build --workspace packages/digital-credentials",
+    "dev:web": "npm run dev --workspace apps/web-demo",
+    "dev:react": "npm run dev --workspace apps/react-demo",
+    "dev:vue": "npm run dev --workspace apps/vue-demo",
+    "test": "npm test --workspaces --if-present"
   }
 }

@@ -1,16 +1,12 @@
-# Digital Credential Web Component
+# Digital Credentials Button
 
-A tiny Web Component that fetches a Digital Credential API request from your backend, calls `navigator.credentials.get`, and posts the credential back for verification.
+A web component that asks your backend for a Digital Credentials API request, calls `navigator.credentials.get`, and posts the returned credential back for verification.
 
-## Usage
-
-Install (after publishing):
+## Package usage
 
 ```bash
 npm install @waltid/digital-credentials
 ```
-
-Register the component and drop it into your page:
 
 ```html
 <script type="module">
@@ -23,55 +19,49 @@ Register the component and drop it into your page:
 ></digital-credentials-button>
 ```
 
-Listen for lifecycle events:
+Events:
 
-```js
-const el = document.querySelector('digital-credentials-button');
-el.addEventListener('credential-request-started', () => console.log('started'));
-el.addEventListener('credential-received', (event) => console.log('success', event.detail));
-el.addEventListener('credential-error', (event) => console.error('error', event.detail));
-```
+- `credential-request-started`
+- `credential-received` (`detail: { credential, backendResponse }`)
+- `credential-error` (`detail: { stage, error }`)
 
-### Attributes / properties
+Attributes / properties:
 
-- `config-endpoint` (**required**): backend endpoint that returns the DC API request and accepts the credential response.
-- `label` (optional): button text, defaults to `Request credentials`.
-- `method` (optional): HTTP verb used when posting the credential, defaults to `POST`.
+- `config-endpoint` (required) — backend endpoint for both the config fetch and credential post
+- `label` (optional) — button text (default: `Request credentials`)
+- `method` (optional) — HTTP verb used when posting the credential (default: `POST`)
 
-### Events
+## Repository layout
 
-- `credential-request-started`: fired when the flow begins.
-- `credential-received`: fired after `navigator.credentials.get` succeeds and the backend accepts the credential. `detail` includes `{ credential, backendResponse }`.
-- `credential-error`: fired on any failure with `{ stage, error }`.
-
-### Backend expectations
-
-- `GET config-endpoint` should return JSON that can be passed into `navigator.credentials.get`. If your backend returns `{ protocol, data }`, the component wraps it into `digital.requests` automatically.
-- A subsequent request to the same endpoint (using `method`) should accept `{ credential }` as JSON and respond with `{ success: boolean, ... }`.
+- `packages/digital-credentials` — the web component source, build config, and types
+- `packages/dc-mock-utils` — shared `installMocks()` helper and Vite dev-server plugin
+- `fixtures/` — shared JSON files for the mock flows
+- `apps/web-demo` — frameworkless demo that mirrors the original sample
+- `apps/react-demo` — React demo using the custom element in JSX
+- `apps/vue-demo` — Vue demo using the custom element in templates
 
 ## Local development
 
-```
-cd digital-credentials-button
+```bash
 npm install
+
+# Build the web component
 npm run build
-npm run dev
+
+# Run a demo (pick one)
+npm run dev:web
+npm run dev:react
+npm run dev:vue
 ```
 
-Open `http://localhost:5173/demo/` for the mocked demo. `demo/mock-environment.js` stubs both the backend endpoint and `navigator.credentials.get` when the API is unavailable.
+Each dev server exposes `GET/POST /api/dc/config` using the shared fixtures so the button works immediately.
 
-### Mock toggle
+## Mocking
 
-The demo ships with a manual mock for both the backend and the Digital Credentials API:
+All demos call `installMocks()` from `@waltid/dc-mock-utils/install-mocks`, which:
 
-- Toggle via query param: append `?dc-mock=1` to the demo URL to enable, `?dc-mock=0` to disable (the UI toggle uses the same values).
-- Or toggle from the demo UI (mock control above the card) which persists to `localStorage (dc-mock-enabled)`.
-- When enabled:
-  - `GET /api/dc/config` returns `src/main/resources/static/direct-unsigned-mdl-request.json`.
-  - `navigator.credentials.get` resolves with `src/main/resources/static/mdl-unsigned-response.json`.
-  - The credential submission returns `src/main/resources/static/mattr-response.json` (and is echoed in the log).
+- stubs `navigator.credentials.get` with `fixtures/unsigned-mdl-response.json`
+- mocks `GET /api/dc/config` with `fixtures/unsigned-mdl-request.json`
+- echoes credential submissions with `fixtures/credentials-response.json`
 
-### Dev server config endpoint
-
-While running `npm run dev`, the Vite dev server also serves `GET /api/dc/config` from `src/main/resources/static/direct-unsigned-mdl-request.json` so the demo button points at a valid configuration out of the box.
-`POST /api/dc/config` returns `src/main/resources/static/mattr-response.json` for local testing.
+Toggle the mock via `?dc-mock=1` / `?dc-mock=0` or the UI toggle (persisted to `localStorage: dc-mock-enabled`).

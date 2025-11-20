@@ -7,7 +7,7 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const repoRoot = resolve(__dirname, '..');
 const dcConfigPath = resolve(
   repoRoot,
-  'direct-unsigned-mdl-request.json'
+  'unsigned-mdl-request.json'
 );
 const dcBackendResponsePath = resolve(
   repoRoot,
