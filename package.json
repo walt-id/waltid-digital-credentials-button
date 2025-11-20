@@ -1,0 +1,36 @@
+{
+  "name": "@waltid/digital-credential-wc",
+  "version": "0.1.0",
+  "description": "Web Component to trigger Digital Credential API requests and forward results to a backend.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/types/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "dev": "vite dev --host",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "digital-credentials",
+    "wallet",
+    "web-component",
+    "digital-credential-api",
+    "web-authn"
+  ],
+  "author": "walt.id",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vite": "^7.2.4"
+  }
+}
