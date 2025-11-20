@@ -1,5 +1,5 @@
 {
-  "name": "@waltid/digital-credentials-wc",
+  "name": "@waltid/digital-credentials",
   "version": "0.1.0",
   "description": "Web Component to trigger Digital Credential API requests and forward results to a backend.",
   "type": "module",

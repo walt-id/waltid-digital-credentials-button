@@ -7,14 +7,14 @@ A tiny Web Component that fetches a Digital Credential API request from your bac
 Install (after publishing):
 
 ```bash
-npm install @waltid/digital-credentials-wc
+npm install @waltid/digital-credentials
 ```
 
 Register the component and drop it into your page:
 
 ```html
 <script type="module">
-  import '@waltid/digital-credentials-wc';
+  import '@waltid/digital-credentials';
 </script>
 
 <digital-credentials-button

@@ -33,10 +33,10 @@ Focus on a clean, minimal implementation that is easy to understand and extend.
   * ESM bundle suitable for import via:
 
     ```ts
-    import '@waltid/digital-credentials-wc';
+    import '@waltid/digital-credentials';
     ```
   * Also usable directly via `<script type="module" …>` from a CDN.
-* Package name (for now): `@waltid/digital-credentials-wc` (configure `package.json` accordingly).
+* Package name (for now): `@waltid/digital-credentials` (configure `package.json` accordingly).
 
 **Tasks:**
 
@@ -316,7 +316,7 @@ The task is complete when:
 2. Importing the library via:
 
    ```ts
-   import '@waltid/digital-credentials-wc';
+   import '@waltid/digital-credentials';
    ```
 
    registers `<digital-credentials-button>` as a custom element.
