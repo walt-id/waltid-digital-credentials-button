@@ -19,7 +19,7 @@ type ObservedAttr =
   | 'label'
   | 'disabled';
 
-const DEFAULT_LABEL = 'Request credentials';
+const DEFAULT_LABEL = 'Request Digital Credentials';
 const DEFAULT_REQUEST_ENDPOINT = '/api/dc/request';
 const DEFAULT_RESPONSE_ENDPOINT = '/api/dc/response';
 

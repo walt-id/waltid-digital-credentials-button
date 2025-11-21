@@ -47,7 +47,7 @@ pre {
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  padding: 0.65rem 1rem;
+  padding: 0.55rem 0.9rem;
   border-radius: 0.5rem;
   border: 1px solid #0f172a;
   background: #111827;
@@ -55,6 +55,7 @@ pre {
   font-weight: 600;
   cursor: pointer;
   transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  min-height: 40px;
 }
 
 .dc-btn:hover:not(:disabled) {
@@ -67,4 +68,68 @@ pre {
   cursor: not-allowed;
   opacity: 0.7;
   box-shadow: none;
+}
+
+.dc-btn-secondary {
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+}
+
+.dc-btn-secondary:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: none;
+  transform: none;
+}
+
+digital-credentials-button::part(button) {
+  min-width: 200px;
+  white-space: nowrap;
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 26px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #e2e8f0;
+  transition: 0.2s;
+  border-radius: 999px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: '';
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.toggle input:checked + .toggle-slider {
+  background-color: #10b981;
+}
+
+.toggle input:checked + .toggle-slider:before {
+  transform: translateX(20px);
 }

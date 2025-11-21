@@ -1,119 +1,83 @@
-import {
-  installMocks,
-  REQUEST_ENDPOINT,
-  RESPONSE_ENDPOINT,
-  MOCK_FLAG_KEY
-} from '@waltid/dc-mock-utils/install-mocks';
+import '@waltid/digital-credentials';
+import { installMocks, REQUEST_ENDPOINT, RESPONSE_ENDPOINT, MOCK_FLAG_KEY } from '@waltid/dc-mock-utils/install-mocks';
 import './style.css';
 
 const urlState = new URL(window.location.href);
 let REQUEST_ID = urlState.searchParams.get('request-id') || 'unsigned-mdl';
+
 const logEl = document.getElementById('log') as HTMLPreElement | null;
-const btn = document.getElementById('demo-btn') as HTMLButtonElement | null;
+const dcButton = document.getElementById('demo-btn') as HTMLElement | null;
 const mockStatus = document.getElementById('mock-status');
-const mockToggle = document.getElementById('mock-toggle');
+const mockToggle = document.getElementById('mock-toggle') as HTMLInputElement | null;
+const requestSelect = document.getElementById('request-select') as HTMLSelectElement | null;
+const clearLogBtn = document.getElementById('clear-log') as HTMLButtonElement | null;
 const logEntries: string[] = [];
 
-installMocks();
-
-btn?.addEventListener('click', async () => {
-  const mockEnabled = getMockEnabled();
-  setLoading(true);
-  logLine(`[started] credential-request-started (${REQUEST_ID})`);
-
-  try {
-    const dcRequest = await fetchDcRequest(REQUEST_ID, mockEnabled);
-    logJson('Digital Credentials API request', dcRequest);
-
-    const dcResponse = await requestCredential(dcRequest);
-    logJson('Digital Credentials API response', dcResponse);
-
-    const verification = await postCredential(dcResponse, mockEnabled);
-    logJson('Credential Verification response', verification);
-  } catch (error) {
-    if (!getMockEnabled()) {
-      console.error('[dc][error]', error);
-    }
-    logJson('[error]', normalizeError(error));
-  } finally {
-    setLoading(false);
+function primeButton(): void {
+  if (!dcButton) return;
+  dcButton.setAttribute('request-id', REQUEST_ID);
+  dcButton.setAttribute('request-endpoint', REQUEST_ENDPOINT);
+  dcButton.setAttribute('response-endpoint', RESPONSE_ENDPOINT);
+  const mockOn = getMockEnabled();
+  if (mockOn) {
+    dcButton.setAttribute('mock', 'true');
+  } else {
+    dcButton.removeAttribute('mock');
   }
-});
-
-function setLoading(next: boolean): void {
-  if (!btn) return;
-  btn.disabled = next;
-  btn.textContent = next ? 'Requesting…' : 'Request credentials';
 }
 
-async function fetchDcRequest(configId: string, mockEnabled: boolean): Promise<unknown> {
-  const url = withMockFlag(new URL(`${REQUEST_ENDPOINT}/${configId}`, window.location.origin), mockEnabled);
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      accept: 'application/json',
-      'x-dc-mock': mockEnabled ? '1' : '0'
-    }
-  });
-
-  const text = await response.text();
-  if (!mockEnabled) {
-    console.info('[dc][request] GET config', { url: url.toString() });
-    console.info('[dc][response] GET config', safeParse(text));
+function wireEvents(): void {
+  if (dcButton) {
+    dcButton.addEventListener('credential-request-started', (event) =>
+      logLine(`[started] credential-request-started (${(event as CustomEvent).detail?.requestId ?? REQUEST_ID})`)
+    );
+    dcButton.addEventListener('credential-request-loaded', (event) =>
+      logJson('Digital Credentials API request', (event as CustomEvent).detail?.payload)
+    );
+    dcButton.addEventListener('credential-dcapi-success', (event) =>
+      logJson('Digital Credentials API response', (event as CustomEvent).detail?.response)
+    );
+    dcButton.addEventListener('credential-dcapi-error', (event) =>
+      logJson('[error:dc-api]', (event as CustomEvent).detail?.error)
+    );
+    dcButton.addEventListener('credential-verification-success', (event) =>
+      logJson('Credential Verification response', (event as CustomEvent).detail?.response)
+    );
+    dcButton.addEventListener('credential-verification-error', (event) =>
+      logJson('[error:verification]', (event as CustomEvent).detail?.error)
+    );
+    dcButton.addEventListener('credential-error', (event) =>
+      logJson('[error]', (event as CustomEvent).detail)
+    );
   }
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch DC request (${response.status})`);
-  }
-  return text ? safeParse(text) : null;
-}
-
-async function requestCredential(dcRequest: unknown): Promise<unknown> {
-  const nav = navigator as unknown as { credentials?: { get?: (opts: unknown) => Promise<unknown> } };
-  if (!nav.credentials?.get) {
-    throw new Error('Digital Credentials API is unavailable in this browser.');
-  }
-  return nav.credentials.get(dcRequest as any);
-}
-
-async function postCredential(dcResponse: unknown, mockEnabled: boolean): Promise<unknown> {
-  const url = withMockFlag(new URL(RESPONSE_ENDPOINT, window.location.origin), mockEnabled);
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      accept: 'application/json',
-      'x-dc-mock': mockEnabled ? '1' : '0'
-    },
-    body: JSON.stringify({ credential: dcResponse })
-  });
-
-  const text = await response.text();
-  if (!mockEnabled) {
-    console.info('[dc][request] POST verification', {
-      url: url.toString(),
-      body: { credential: dcResponse }
+  if (mockToggle) {
+    mockToggle.checked = getMockEnabled();
+    mockToggle.addEventListener('change', () => {
+      setMockEnabled(mockToggle.checked);
+      primeButton();
+      renderMockStatus();
     });
-    console.info('[dc][response] POST verification', safeParse(text));
   }
 
-  if (!response.ok) {
-    throw new Error(text || `Backend verification failed (${response.status})`);
+  if (requestSelect) {
+    requestSelect.value = REQUEST_ID;
+    requestSelect.addEventListener('change', () => {
+      REQUEST_ID = requestSelect.value;
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set('request-id', REQUEST_ID);
+      window.history.replaceState({}, '', nextUrl.toString());
+      primeButton();
+      logLine(`[info] switched request-id to ${REQUEST_ID}`);
+    });
   }
 
-  if (!text) return {};
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { raw: text };
+  if (clearLogBtn) {
+    clearLogBtn.addEventListener('click', () => {
+      logEntries.length = 0;
+      renderLog();
+    });
   }
-}
-
-function withMockFlag(url: URL, mockEnabled: boolean): string {
-  if (mockEnabled) {
-    url.searchParams.set('dc-mock', '1');
-  }
-  return url.toString();
 }
 
 const renderLog = () => {
@@ -138,9 +102,6 @@ function getMockEnabled(): boolean {
 
 function setMockEnabled(next: boolean): void {
   localStorage.setItem(MOCK_FLAG_KEY, String(next));
-  const url = new URL(window.location.href);
-  url.searchParams.set('dc-mock', next ? '1' : '0');
-  window.location.assign(url.toString());
 }
 
 function renderMockStatus(): void {
@@ -148,51 +109,10 @@ function renderMockStatus(): void {
   const enabled = getMockEnabled();
   mockStatus.textContent = enabled ? 'ON' : 'OFF';
   mockStatus.style.color = enabled ? '#16a34a' : '#dc2626';
-  mockToggle.textContent = enabled ? 'Disable' : 'Enable';
 }
 
-if (mockToggle) {
-  mockToggle.addEventListener('click', () => {
-    setMockEnabled(!getMockEnabled());
-  });
-}
-
+installMocks();
+primeButton();
 renderLog();
 renderMockStatus();
-
-function normalizeError(error: unknown): Record<string, unknown> {
-  if (error instanceof Error) {
-    return { message: error.message };
-  }
-  return { error };
-}
-
-function clone<T>(value: T): T {
-  if (typeof structuredClone === 'function') {
-    try {
-      return structuredClone(value);
-    } catch {
-      // fall through
-    }
-  }
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
-function safeParse(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-const requestSelect = document.getElementById('request-select') as HTMLSelectElement | null;
-if (requestSelect) {
-  requestSelect.value = REQUEST_ID;
-  requestSelect.addEventListener('change', () => {
-    REQUEST_ID = requestSelect.value;
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set('request-id', REQUEST_ID);
-    window.location.assign(nextUrl.toString());
-  });
-}
+wireEvents();

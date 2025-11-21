@@ -28,14 +28,31 @@
           </select>
           <div style="margin-left: auto; display: inline-flex; align-items: center; gap: 8px;">
             <strong>Mock mode</strong>
+            <label class="toggle" aria-label="Toggle mock mode">
+              <input type="checkbox" id="mock-toggle" />
+              <span class="toggle-slider"></span>
+            </label>
             <span id="mock-status"></span>
-            <button id="mock-toggle">Toggle mock</button>
           </div>
         </div>
       </section>
 
       <section class="card">
-        <button id="demo-btn" type="button" class="dc-btn">Request credentials</button>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+          <digital-credentials-button
+            id="demo-btn"
+            request-endpoint="/api/dc/request"
+            response-endpoint="/api/dc/response"
+            label="Request Digital Credentials"
+          ></digital-credentials-button>
+          <button
+            id="clear-log"
+            type="button"
+            class="dc-btn dc-btn-secondary"
+          >
+            Clear log
+          </button>
+        </div>
 
         <h3>Event log</h3>
         <pre id="log">(click the button to start)</pre>
