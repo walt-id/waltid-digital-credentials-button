@@ -52,6 +52,8 @@ function init(): void {
         logLine(
           `[started] credential-request-started (${(event as CustomEvent).detail?.requestId ?? REQUEST_ID})`
         );
+        console.log('checking DC API support.sdfsdf..');
+        maybeLogUnsupported();
       });
       dcButton.addEventListener('credential-request-loaded', (event) =>
         logJson('Digital Credentials API request', (event as CustomEvent).detail?.payload)
@@ -195,6 +197,19 @@ function init(): void {
     logJson('Credential Verification response', response);
     if (getShowCredentialEnabled()) {
       showCredentialModal(response);
+    }
+  }
+
+  function hasDcApiSupport(): boolean {
+    return typeof (window as { DigitalCredential?: unknown }).DigitalCredential !== 'undefined';
+  }
+
+  function maybeLogUnsupported(): void {
+    if (getMockEnabled()) return;
+    if (!hasDcApiSupport()) {
+      logLine(
+        '[error:dc-api] Digital Credentials API is not available in this browser. Please switch to a compatible browser or enable mock mode.'
+      );
     }
   }
 
