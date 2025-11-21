@@ -181,7 +181,10 @@ function extractFirstCredential(input: unknown): MinimalCredential {
 
 <template>
   <main>
-    <h1>Digital Credentials Button</h1>
+    <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:12px;">
+      <img src="/waltid-logo.svg" alt="walt.id logo" style="height:48px; width:auto;" />
+      <h1 style="margin:0;">Digital Credentials Button</h1>
+    </div>
     <p class="lead">
       Vue example of the web component that fetches a Digital Credentials API request from a backend,
       calls <code>navigator.credentials.get</code>, and posts the result back.

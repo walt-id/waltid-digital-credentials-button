@@ -120,7 +120,10 @@ export default function App() {
 
   return (
     <main>
-      <h1>Digital Credentials Button</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+        <img src="/waltid-logo.svg" alt="walt.id logo" style={{ height: 48, width: 'auto' }} />
+        <h1 style={{ margin: 0 }}>Digital Credentials Button</h1>
+      </div>
       <p className="lead">
         React example of the web component that fetches a Digital Credentials API request from a backend,
         calls <code>navigator.credentials.get</code>, and posts the result back.
