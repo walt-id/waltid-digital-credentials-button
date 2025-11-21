@@ -98,16 +98,14 @@ export default function App() {
     logLine(`[info] switched request-id to ${value}`);
   };
 
-  const toggleMock = () => {
-    const next = !mockEnabled;
-    localStorage.setItem(MOCK_FLAG_KEY, String(next));
-    setMockEnabled(next);
-    const url = new URL(window.location.href);
-    url.searchParams.set('dc-mock', next ? '1' : '0');
-    window.history.replaceState({}, '', url.toString());
-    const btn = btnRef.current;
-    if (btn) primeButton(btn, requestId, next);
-  };
+const toggleMock = () => {
+  const next = !mockEnabled;
+  localStorage.setItem(MOCK_FLAG_KEY, String(next));
+  setMockEnabled(next);
+  const url = new URL(window.location.href);
+  url.searchParams.set('dc-mock', next ? '1' : '0');
+  window.location.assign(url.toString());
+};
 
   const toggleShowCredential = () => {
     const next = !showCredential;

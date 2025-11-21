@@ -147,6 +147,7 @@ function init(): void {
   function setMockEnabled(next: boolean): void {
     localStorage.setItem(MOCK_FLAG_KEY, String(next));
     syncMockParam(next);
+    window.location.reload();
   }
 
   function getShowCredentialEnabled(): boolean {

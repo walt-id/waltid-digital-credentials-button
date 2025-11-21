@@ -61,8 +61,7 @@ const toggleMock = () => {
   mockEnabled.value = next;
   const url = new URL(window.location.href);
   url.searchParams.set('dc-mock', next ? '1' : '0');
-  window.history.replaceState({}, '', url.toString());
-  primeButton();
+  window.location.assign(url.toString());
 };
 
 const toggleShowCredential = () => {
