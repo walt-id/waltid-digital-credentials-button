@@ -2,7 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { REQUEST_ENDPOINT, MOCK_FLAG_KEY } from '@waltid/dc-mock-utils/install-mocks';
 
-const configEndpoint = REQUEST_ENDPOINT;
+const requestId = new URL(window.location.href).searchParams.get('request-id') || 'unsigned-mdl';
+const configEndpoint = `${REQUEST_ENDPOINT}/${requestId}`;
 const btnRef = ref<HTMLElement | null>(null);
 const logEntries = ref<string[]>([]);
 const mockEnabled = ref(getMockEnabled());
@@ -75,7 +76,6 @@ function getMockEnabled(): boolean {
           {{ mockEnabled ? 'ON' : 'OFF' }}
         </span>
         <button @click="toggleMock">Toggle mock</button>
-        <small style="color: #475569">Uses builtin JSON fixtures when enabled.</small>
       </div>
     </section>
 

@@ -15,11 +15,22 @@
       </p>
 
       <section class="card" style="margin-bottom: 16px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <strong>Mock mode</strong>
-          <span id="mock-status"></span>
-          <button id="mock-toggle">Toggle mock</button>
-          <small style="color:#475569;">Uses builtin JSON fixtures when enabled.</small>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <label for="request-select"><strong>Request</strong></label>
+          <select
+            id="request-select"
+            style="min-width: 200px; padding: 6px 10px; border-radius: 8px; border: 1px solid #e2e8f0;"
+          >
+            <option value="unsigned-mdl">unsigned-mdl</option>
+            <option value="signed-mdl">signed-mdl</option>
+            <option value="unsigned-photoid">unsigned-photoid</option>
+            <option value="signed-photoid">signed-photoid</option>
+          </select>
+          <div style="margin-left: auto; display: inline-flex; align-items: center; gap: 8px;">
+            <strong>Mock mode</strong>
+            <span id="mock-status"></span>
+            <button id="mock-toggle">Toggle mock</button>
+          </div>
         </div>
       </section>
 

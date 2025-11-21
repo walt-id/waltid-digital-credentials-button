@@ -4,10 +4,10 @@ import {
   RESPONSE_ENDPOINT,
   MOCK_FLAG_KEY
 } from '@waltid/dc-mock-utils/install-mocks';
-import dcApiMockResponse from '../../../fixtures/unsigned-mdl-response.json' assert { type: 'json' };
 import './style.css';
 
-const REQUEST_ID = 'unsigned-mdl';
+const urlState = new URL(window.location.href);
+let REQUEST_ID = urlState.searchParams.get('request-id') || 'unsigned-mdl';
 const logEl = document.getElementById('log') as HTMLPreElement | null;
 const btn = document.getElementById('demo-btn') as HTMLButtonElement | null;
 const mockStatus = document.getElementById('mock-status');
@@ -19,13 +19,13 @@ installMocks();
 btn?.addEventListener('click', async () => {
   const mockEnabled = getMockEnabled();
   setLoading(true);
-  logLine('[started] credential-request-started');
+  logLine(`[started] credential-request-started (${REQUEST_ID})`);
 
   try {
     const dcRequest = await fetchDcRequest(REQUEST_ID, mockEnabled);
     logJson('Digital Credentials API request', dcRequest);
 
-    const dcResponse = mockEnabled ? clone(dcApiMockResponse) : await requestCredential(dcRequest);
+    const dcResponse = await requestCredential(dcRequest);
     logJson('Digital Credentials API response', dcResponse);
 
     const verification = await postCredential(dcResponse, mockEnabled);
@@ -184,4 +184,15 @@ function safeParse(text: string): unknown {
   } catch {
     return text;
   }
+}
+
+const requestSelect = document.getElementById('request-select') as HTMLSelectElement | null;
+if (requestSelect) {
+  requestSelect.value = REQUEST_ID;
+  requestSelect.addEventListener('change', () => {
+    REQUEST_ID = requestSelect.value;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('request-id', REQUEST_ID);
+    window.location.assign(nextUrl.toString());
+  });
 }

@@ -1,6 +1,15 @@
-import configPayload from '../../../fixtures/unsigned-mdl-request.json' assert { type: 'json' };
-import dcApiResponse from '../../../fixtures/unsigned-mdl-response.json' assert { type: 'json' };
-import backendResponse from '../../../fixtures/unsigned-mdl-verified.json' assert { type: 'json' };
+import unsignedMdlRequest from '../../../fixtures/unsigned-mdl-request.json' assert { type: 'json' };
+import unsignedMdlResponse from '../../../fixtures/unsigned-mdl-response.json' assert { type: 'json' };
+import unsignedMdlVerified from '../../../fixtures/unsigned-mdl-verified.json' assert { type: 'json' };
+import signedMdlRequest from '../../../fixtures/signed-mdl-request.json' assert { type: 'json' };
+import signedMdlResponse from '../../../fixtures/signed-mdl-response.json' assert { type: 'json' };
+import signedMdlVerified from '../../../fixtures/signed-mdl-verified.json' assert { type: 'json' };
+import unsignedPhotoRequest from '../../../fixtures/unsigned-photoid-request.json' assert { type: 'json' };
+import unsignedPhotoResponse from '../../../fixtures/unsigned-photoid-response.json' assert { type: 'json' };
+import unsignedPhotoVerified from '../../../fixtures/unsigned-photoid-verified.json' assert { type: 'json' };
+import signedPhotoRequest from '../../../fixtures/signed-photoid-request.json' assert { type: 'json' };
+import signedPhotoResponse from '../../../fixtures/signed-photoid-response.json' assert { type: 'json' };
+import signedPhotoVerified from '../../../fixtures/signed-photoid-verified.json' assert { type: 'json' };
 
 export const REQUEST_ENDPOINT = '/api/dc/request';
 export const RESPONSE_ENDPOINT = '/api/dc/response';
@@ -29,9 +38,12 @@ function patchFetch(): void {
   window.fetch = async (input: FetchInput, init: RequestInit = {}) => {
     const method = (init.method || 'GET').toUpperCase();
     const target = resolveUrl(input);
+    const requestId = getRequestId(target);
+    const fixtures = pickFixtures(requestId);
+
     const mockResponse = method === 'GET' && target.pathname.startsWith(REQUEST_ENDPOINT);
     if (mockResponse) {
-      return jsonResponse(configPayload);
+      return jsonResponse(fixtures.request);
     }
     const isResponseEndpoint =
       target.pathname.startsWith(RESPONSE_ENDPOINT) || target.pathname.startsWith(REQUEST_ENDPOINT);
@@ -39,8 +51,8 @@ function patchFetch(): void {
       const bodyText = await readBody(init.body);
       const body = bodyText ? safeParse(bodyText) : null;
       return jsonResponse({
-        ...(backendResponse as Record<string, unknown>),
-        success: (backendResponse as Record<string, unknown>)?.success ?? true,
+        ...(fixtures.verified as Record<string, unknown>),
+        success: (fixtures.verified as Record<string, unknown>)?.success ?? true,
         echo: body
       });
     }
@@ -118,6 +130,50 @@ function safeParse(text: string): unknown {
   }
 }
 
+function getRequestId(url: URL): string {
+  const fromQuery = url.searchParams.get('request-id') || url.searchParams.get('requestId');
+  if (fromQuery) return fromQuery;
+
+  if (url.pathname.startsWith(REQUEST_ENDPOINT)) {
+    const suffix = url.pathname.replace(REQUEST_ENDPOINT, '');
+    const parts = suffix.split('/').filter(Boolean);
+    if (parts[0]) return parts[0];
+  }
+
+  return 'unsigned-mdl';
+}
+
+function pickFixtures(requestId: string): {
+  request: unknown;
+  response: unknown;
+  verified: unknown;
+} {
+  const map: Record<string, { request: unknown; response: unknown; verified: unknown }> = {
+    'unsigned-mdl': {
+      request: unsignedMdlRequest,
+      response: unsignedMdlResponse,
+      verified: unsignedMdlVerified
+    },
+    'signed-mdl': {
+      request: signedMdlRequest,
+      response: signedMdlResponse,
+      verified: signedMdlVerified
+    },
+    'unsigned-photoid': {
+      request: unsignedPhotoRequest,
+      response: unsignedPhotoResponse,
+      verified: unsignedPhotoVerified
+    },
+    'signed-photoid': {
+      request: signedPhotoRequest,
+      response: signedPhotoResponse,
+      verified: signedPhotoVerified
+    }
+  };
+
+  return map[requestId] ?? map['unsigned-mdl'];
+}
+
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -135,12 +191,14 @@ function structuredCloneOrDefault<T>(value: T): T {
 
 function ensureMockedCredentialsGet(): void {
   const mockGet = async (options: CredentialRequestOptions | undefined) => {
+    const target = new URL(window.location.href);
+    const fixtures = pickFixtures(getRequestId(target));
     console.info(
-      '[dc-mock] Using stubbed navigator.credentials.get with payload from unsigned-mdl-response.json',
+      '[dc-mock] Using stubbed navigator.credentials.get with payload from mock response',
       options
     );
     await wait(200);
-    return structuredCloneOrDefault(dcApiResponse);
+    return structuredCloneOrDefault(fixtures.response);
   };
 
   try {

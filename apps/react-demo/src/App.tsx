@@ -5,6 +5,7 @@ export default function App() {
   const btnRef = useRef<HTMLElement | null>(null);
   const [logEntries, setLogEntries] = useState<string[]>([]);
   const [mockEnabled, setMockEnabled] = useState<boolean>(getMockEnabled());
+  const requestId = new URL(window.location.href).searchParams.get('request-id') || 'unsigned-mdl';
 
   useEffect(() => {
     const btn = btnRef.current;
@@ -65,14 +66,13 @@ export default function App() {
             {mockEnabled ? 'ON' : 'OFF'}
           </span>
           <button onClick={toggleMock}>Toggle mock</button>
-          <small style={{ color: '#475569' }}>Uses builtin JSON fixtures when enabled.</small>
         </div>
       </section>
 
       <section className="card">
         <digital-credentials-button
           ref={btnRef}
-          config-endpoint={REQUEST_ENDPOINT}
+          config-endpoint={`${REQUEST_ENDPOINT}/${requestId}`}
           label="Request credentials"
         ></digital-credentials-button>
 

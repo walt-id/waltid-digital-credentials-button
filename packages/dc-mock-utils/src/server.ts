@@ -100,9 +100,11 @@ function isTruthy(value: string): boolean {
 }
 
 function getConfigurationId(url: URL): string {
+  const fromQuery = url.searchParams.get('request-id') || url.searchParams.get('requestId');
+  if (fromQuery) return fromQuery;
   const pathname = url.pathname.replace(REQUEST_ENDPOINT, '');
   const parts = pathname.split('/').filter(Boolean);
-  return parts[0] ?? 'default';
+  return parts[0] ?? 'unsigned-mdl';
 }
 
 
@@ -149,7 +151,7 @@ async function createSession(configurationId: string): Promise<string> {
 
 function buildSessionCreatePayload(configurationId: string): unknown {
 
-    const path = resolve(configDir, `config-${configurationId}.json`);
+    const path = resolve(configDir, `${configurationId}-conf.json`);
     const raw = fs.readFileSync(path, 'utf8');
     console.log(`raw ${raw}`);
     const sessionCreateConfig = JSON.parse(raw)

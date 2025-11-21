@@ -37,7 +37,7 @@
       }
     ]
   },
-  "signedRequest": true,
+  "signedRequest": false,
   "encryptedResponse": false,
   "dcApi": true,
   "haip": false,
