@@ -4,6 +4,7 @@ import './style.css';
 
 const urlState = new URL(window.location.href);
 let REQUEST_ID = urlState.searchParams.get('request-id') || 'unsigned-mdl';
+const initialMock = resolveInitialMock();
 
 const logEl = document.getElementById('log') as HTMLPreElement | null;
 const dcButton = document.getElementById('demo-btn') as HTMLElement | null;
@@ -102,6 +103,7 @@ function getMockEnabled(): boolean {
 
 function setMockEnabled(next: boolean): void {
   localStorage.setItem(MOCK_FLAG_KEY, String(next));
+  syncMockParam(next);
 }
 
 function renderMockStatus(): void {
@@ -116,3 +118,23 @@ primeButton();
 renderLog();
 renderMockStatus();
 wireEvents();
+
+function resolveInitialMock(): boolean {
+  const url = new URL(window.location.href);
+  const param = url.searchParams.get('dc-mock');
+  if (param !== null) {
+    const enabled = param === '1' || param.toLowerCase() === 'true';
+    localStorage.setItem(MOCK_FLAG_KEY, String(enabled));
+    return enabled;
+  }
+  const stored = localStorage.getItem(MOCK_FLAG_KEY);
+  const enabled = stored === 'true';
+  localStorage.setItem(MOCK_FLAG_KEY, String(enabled));
+  return enabled;
+}
+
+function syncMockParam(enabled: boolean): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set('dc-mock', enabled ? '1' : '0');
+  window.history.replaceState({}, '', url.toString());
+}
