@@ -1,6 +1,7 @@
 import { DigitalCredentialButton } from './digital-credentials-button';
 
 export * from './digital-credentials-button';
+export * from '@waltid/dc-client';
 
 const TAG_NAME = 'digital-credentials-button';
 

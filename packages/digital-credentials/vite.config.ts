@@ -17,7 +17,7 @@ export default defineConfig({
     },
     sourcemap: true,
     rollupOptions: {
-      external: []
+      external: ['@waltid/dc-client']
     }
   },
   server: {

@@ -2,16 +2,13 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ESNext",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "moduleResolution": "Bundler",
-    "resolveJsonModule": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "strict": true,
-    "skipLibCheck": true,
+    "resolveJsonModule": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "paths": {
-      "@waltid/dc-client": ["../dc-client/src"]
-    }
+    "skipLibCheck": true
   },
   "include": ["src"]
 }

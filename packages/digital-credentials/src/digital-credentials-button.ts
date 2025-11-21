@@ -1,52 +1,31 @@
-export type ErrorStage =
-  | 'config-fetch'
-  | 'dc-api'
-  | 'backend'
-  | 'unsupported'
-  | 'unknown';
+import { requestCredential, CredentialFlowError, CredentialFlowResult } from '@waltid/dc-client';
 
-export type DcRequestConfig = {
-  digital?: {
-    requests?: Array<{ protocol: string; data: unknown }>;
-    mediation?: string;
-    [key: string]: unknown;
-  };
-  protocol?: string;
-  data?: unknown;
-  mediation?: string;
-  [key: string]: unknown;
+type DcButtonEventMap = {
+  'credential-request-started': CustomEvent<{ requestId: string }>;
+  'credential-request-loaded': CustomEvent<{ requestId: string; payload: unknown }>;
+  'credential-dcapi-success': CustomEvent<{ requestId: string; response: unknown }>;
+  'credential-dcapi-error': CustomEvent<{ requestId: string; error: unknown }>;
+  'credential-verification-success': CustomEvent<{ requestId: string; response: unknown }>;
+  'credential-verification-error': CustomEvent<{ requestId: string; error: unknown }>;
+  'credential-finished': CustomEvent<{ requestId: string; result?: CredentialFlowResult; error?: unknown }>;
+  'credential-error': CustomEvent<{ stage: string; error: unknown; requestId: string }>;
 };
 
-export type BackendVerificationResponse = {
-  success: boolean;
-  [key: string]: unknown;
-};
-
-export interface DigitalCredentialReceivedDetail {
-  credential: unknown;
-  backendResponse: BackendVerificationResponse;
-}
-
-export interface DigitalCredentialErrorDetail {
-  stage: ErrorStage;
-  error: unknown;
-}
-
-type DigitalRequestPayload = {
-  digital: {
-    requests: Array<{ protocol: string; data: unknown }>;
-    mediation?: string;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-};
+type ObservedAttr =
+  | 'request-id'
+  | 'request-endpoint'
+  | 'response-endpoint'
+  | 'mock'
+  | 'label'
+  | 'disabled';
 
 const DEFAULT_LABEL = 'Request credentials';
-const DEFAULT_METHOD = 'POST';
+const DEFAULT_REQUEST_ENDPOINT = '/api/dc/request';
+const DEFAULT_RESPONSE_ENDPOINT = '/api/dc/response';
 
 export class DigitalCredentialButton extends HTMLElement {
-  static get observedAttributes(): string[] {
-    return ['config-endpoint', 'label', 'method'];
+  static get observedAttributes(): ObservedAttr[] {
+    return ['request-id', 'request-endpoint', 'response-endpoint', 'mock', 'label', 'disabled'];
   }
 
   #shadow: ShadowRoot;
@@ -119,92 +98,84 @@ export class DigitalCredentialButton extends HTMLElement {
     this.#render();
   }
 
-  get configEndpoint(): string {
-    return this.getAttribute('config-endpoint') ?? '';
+  get requestId(): string {
+    return this.getAttribute('request-id') || 'unsigned-mdl';
+  }
+  set requestId(value: string) {
+    this.setAttribute('request-id', value);
   }
 
-  set configEndpoint(value: string) {
-    if (value == null) {
-      this.removeAttribute('config-endpoint');
-      return;
+  get requestEndpoint(): string {
+    return this.getAttribute('request-endpoint') || DEFAULT_REQUEST_ENDPOINT;
+  }
+  set requestEndpoint(value: string) {
+    this.setAttribute('request-endpoint', value);
+  }
+
+  get responseEndpoint(): string {
+    return this.getAttribute('response-endpoint') || DEFAULT_RESPONSE_ENDPOINT;
+  }
+  set responseEndpoint(value: string) {
+    this.setAttribute('response-endpoint', value);
+  }
+
+  get mock(): boolean {
+    return this.getAttribute('mock') === 'true';
+  }
+  set mock(value: boolean) {
+    if (value) {
+      this.setAttribute('mock', 'true');
+    } else {
+      this.removeAttribute('mock');
     }
-    this.setAttribute('config-endpoint', value);
   }
 
   get label(): string {
-    return this.getAttribute('label') ?? DEFAULT_LABEL;
+    return this.getAttribute('label') || DEFAULT_LABEL;
   }
-
   set label(value: string) {
-    if (value == null) {
-      this.removeAttribute('label');
-      return;
-    }
     this.setAttribute('label', value);
   }
 
-  get method(): string {
-    return this.getAttribute('method') ?? DEFAULT_METHOD;
+  get disabled(): boolean {
+    return this.hasAttribute('disabled');
   }
-
-  set method(value: string) {
-    if (value == null) {
-      this.removeAttribute('method');
-      return;
+  set disabled(value: boolean) {
+    if (value) {
+      this.setAttribute('disabled', '');
+    } else {
+      this.removeAttribute('disabled');
     }
-    this.setAttribute('method', value);
   }
 
   #render(): void {
-    this.#button.textContent = this.#loading ? 'Requesting...' : this.label;
-    this.#button.disabled = this.#loading || !this.configEndpoint || !this.#hasDcApi();
-
-    if (!this.configEndpoint) {
-      this.#setStatus('Set the config-endpoint attribute to start the flow.');
-      return;
+    this.#button.textContent = this.#loading ? 'Requesting…' : this.label;
+    this.#button.disabled = this.#loading || this.disabled;
+    if (!this.requestEndpoint || !this.responseEndpoint || !this.requestId) {
+      this.#setStatus('Set request-id, request-endpoint, and response-endpoint to begin.');
+    } else {
+      this.#setStatus('');
     }
-
-    if (!this.#hasDcApi()) {
-      this.#setStatus('Digital Credentials API is not supported in this browser yet.');
-      return;
-    }
-
-    this.#setStatus('');
   }
 
   #setStatus(message: string): void {
     this.#status.textContent = message;
   }
 
-  #setLoading(next: boolean): void {
-    this.#loading = next;
-    this.#render();
-  }
-
-  #hasDcApi(): boolean {
-    const nav = globalThis.navigator as unknown as {
-      credentials?: { get?: (...args: unknown[]) => Promise<unknown> };
-    };
-    return Boolean(nav && nav.credentials && typeof nav.credentials.get === 'function');
-  }
-
   async #handleClick(): Promise<void> {
-    if (this.#loading) {
+    if (this.#loading || this.disabled) {
       return;
     }
 
-    if (!this.configEndpoint) {
-      this.#emitError('config-fetch', 'config-endpoint is required.');
-      return;
-    }
-
-    if (!this.#hasDcApi()) {
-      this.#emitError('unsupported', 'Digital Credentials API is not available in this browser.');
+    const requestId = this.requestId;
+    if (!requestId) {
+      this.#emitError('request', 'request-id is required');
       return;
     }
 
     this.dispatchEvent(
       new CustomEvent('credential-request-started', {
+        detail: { requestId },
         bubbles: true,
         composed: true
       })
@@ -213,229 +184,105 @@ export class DigitalCredentialButton extends HTMLElement {
     this.#setLoading(true);
 
     try {
-      const config = await this.#fetchConfig();
-      const requestPayload = this.#normalizeRequest(config);
-
-      if (!requestPayload) {
-        this.#emitError('config-fetch', 'Config payload is missing a digital credential request.');
-        return;
-      }
-
-      const credential = await this.#invokeDigitalCredentialApi(requestPayload);
-      const backendResponse = await this.#sendToBackend(credential);
+      const result = await requestCredential({
+        requestId,
+        requestEndpoint: this.requestEndpoint,
+        responseEndpoint: this.responseEndpoint,
+        mock: this.mock
+      });
 
       this.dispatchEvent(
-        new CustomEvent<DigitalCredentialReceivedDetail>('credential-received', {
-          detail: { credential, backendResponse },
+        new CustomEvent('credential-request-loaded', {
+          detail: { requestId, payload: result.request },
           bubbles: true,
           composed: true
         })
       );
-    } catch (error) {
-      if (error instanceof StageError) {
-        this.#emitError(error.stage, error.cause ?? error.message);
-      } else {
-        this.#emitError('unknown', error);
-      }
+
+      this.dispatchEvent(
+        new CustomEvent('credential-dcapi-success', {
+          detail: { requestId, response: result.dcResponse },
+          bubbles: true,
+          composed: true
+        })
+      );
+
+      this.dispatchEvent(
+        new CustomEvent('credential-verification-success', {
+          detail: { requestId, response: result.verification },
+          bubbles: true,
+          composed: true
+        })
+      );
+
+      this.dispatchEvent(
+        new CustomEvent('credential-finished', {
+          detail: { requestId, result },
+          bubbles: true,
+          composed: true
+        })
+      );
+    } catch (error: unknown) {
+      this.#handleFlowError(error, requestId);
     } finally {
       this.#setLoading(false);
     }
   }
 
-  async #fetchConfig(): Promise<DcRequestConfig> {
-    try {
-      const response = await fetch(this.configEndpoint, {
-        method: 'GET',
-        headers: { accept: 'application/json' },
-        cache: 'no-store'
-      });
+  #handleFlowError(error: unknown, requestId: string): void {
+    if (error instanceof CredentialFlowError) {
+      const stage =
+        error.stage === 'request'
+          ? 'credential-request-loaded'
+          : error.stage === 'dc-api'
+            ? 'credential-dcapi-error'
+            : error.stage === 'verification'
+              ? 'credential-verification-error'
+              : 'credential-error';
 
-      if (!response.ok) {
-        throw new StageError('config-fetch', `Config request failed (${response.status})`);
+      if (stage === 'credential-dcapi-error' || stage === 'credential-verification-error') {
+        this.dispatchEvent(
+          new CustomEvent(stage, {
+            detail: { requestId, error },
+            bubbles: true,
+            composed: true
+          })
+        );
       }
-
-      const payload = await response.json();
-      return payload as DcRequestConfig;
-    } catch (error) {
-      if (error instanceof StageError) {
-        throw error;
-      }
-      const message = error instanceof Error ? error.message : 'Unable to fetch DC config.';
-      throw new StageError('config-fetch', message);
+      this.#emitError(error.stage, error, requestId);
+    } else {
+      this.#emitError('unexpected', error, requestId);
     }
-  }
-
-  #normalizeRequest(config: DcRequestConfig): DigitalRequestPayload | null {
-    if (!config || typeof config !== 'object') {
-      return null;
-    }
-
-    if (config.digital && Array.isArray(config.digital.requests) && config.digital.requests.length) {
-      return {
-        ...config,
-        digital: {
-          ...config.digital,
-          requests: [...config.digital.requests]
-        }
-      };
-    }
-
-    if (config.protocol && config.data) {
-      return {
-        digital: {
-          requests: [
-            {
-              protocol: String(config.protocol),
-              data: config.data
-            }
-          ],
-          mediation: config.mediation
-        }
-      };
-    }
-
-    return null;
-  }
-
-  async #invokeDigitalCredentialApi(requestPayload: DigitalRequestPayload): Promise<unknown> {
-    try {
-      const nav = navigator as unknown as {
-        credentials: { get: (opts: unknown) => Promise<unknown> };
-      };
-
-      const credential = await nav.credentials.get(requestPayload as unknown);
-      if (credential == null) {
-        throw new StageError('dc-api', 'Digital Credentials API did not return a credential.');
-      }
-      return credential;
-    } catch (error) {
-      if (error instanceof StageError) {
-        throw error;
-      }
-      const message = error instanceof Error ? error.message : 'Digital Credentials API call failed.';
-      throw new StageError('dc-api', message);
-    }
-  }
-
-  async #sendToBackend(credential: unknown): Promise<BackendVerificationResponse> {
-    const method = (this.method || DEFAULT_METHOD).toUpperCase();
-    const preparedCredential = this.#prepareCredentialForBackend(credential);
-
-    if (preparedCredential == null) {
-      throw new StageError('backend', 'Credential payload is empty.');
-    }
-
-    let body: string;
-    try {
-      body = JSON.stringify({ credential: preparedCredential });
-    } catch (error) {
-      throw new StageError('backend', `Failed to serialise credential: ${String(error)}`);
-    }
-
-    try {
-      const response = await fetch(this.configEndpoint, {
-        method,
-        headers: {
-          'content-type': 'application/json',
-          accept: 'application/json'
-        },
-        body
-      });
-
-      const text = await response.text();
-      let parsed: BackendVerificationResponse | null = null;
-      if (text) {
-        try {
-          parsed = JSON.parse(text) as BackendVerificationResponse;
-        } catch (error) {
-          throw new StageError('backend', `Failed to parse backend response: ${String(error)}`);
-        }
-      }
-
-      if (!response.ok) {
-        const message =
-          (parsed && typeof parsed === 'object' && 'message' in parsed && (parsed as any).message) ||
-          text ||
-          'Backend request failed.';
-        throw new StageError('backend', String(message));
-      }
-
-      return parsed ?? { success: true };
-    } catch (error) {
-      if (error instanceof StageError) {
-        throw error;
-      }
-      const message = error instanceof Error ? error.message : 'Backend request failed.';
-      throw new StageError('backend', message);
-    }
-  }
-
-  #emitError(stage: ErrorStage, reason: unknown): void {
-    const detail: DigitalCredentialErrorDetail = {
-      stage,
-      error: reason
-    };
 
     this.dispatchEvent(
-      new CustomEvent<DigitalCredentialErrorDetail>('credential-error', {
-        detail,
+      new CustomEvent('credential-finished', {
+        detail: { requestId, error },
         bubbles: true,
         composed: true
       })
     );
-
-    if (stage === 'unsupported') {
-      this.#setStatus('Digital Credentials API is not supported in this browser yet.');
-    } else if (stage === 'config-fetch') {
-      this.#setStatus('Unable to load credential request configuration.');
-    } else if (stage === 'dc-api') {
-      this.#setStatus('Digital Credentials API returned an error.');
-    } else if (stage === 'backend') {
-      this.#setStatus('Backend verification failed.');
-    } else {
-      this.#setStatus('Credential flow failed.');
-    }
   }
 
-  #prepareCredentialForBackend(credential: unknown): unknown {
-    if (credential == null) {
-      return null;
-    }
+  #emitError(stage: string, reason: unknown, requestId?: string): void {
+    this.dispatchEvent(
+      new CustomEvent('credential-error', {
+        detail: { stage, error: reason, requestId },
+        bubbles: true,
+        composed: true
+      })
+    );
+    this.#setStatus('Credential flow failed.');
+  }
 
-    if (typeof credential === 'object') {
-      const asObject = credential as { toJSON?: () => unknown };
-      if (typeof asObject.toJSON === 'function') {
-        try {
-          return asObject.toJSON();
-        } catch (_) {
-          // Continue to other strategies.
-        }
-      }
-
-      if (typeof structuredClone === 'function') {
-        try {
-          return structuredClone(credential);
-        } catch (_) {
-          // Continue to JSON fallback.
-        }
-      }
-    }
-
-    try {
-      return JSON.parse(JSON.stringify(credential));
-    } catch (_) {
-      return credential;
-    }
+  #setLoading(next: boolean): void {
+    this.#loading = next;
+    this.#render();
   }
 }
 
-class StageError extends Error {
-  stage: ErrorStage;
-  cause?: unknown;
-
-  constructor(stage: ErrorStage, message: string, cause?: unknown) {
-    super(message);
-    this.stage = stage;
-    this.cause = cause;
+declare global {
+  interface HTMLElementTagNameMap {
+    'digital-credentials-button': DigitalCredentialButton;
   }
+  interface HTMLElementEventMap extends DcButtonEventMap {}
 }

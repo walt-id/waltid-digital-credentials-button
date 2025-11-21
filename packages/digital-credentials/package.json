@@ -29,6 +29,9 @@
   ],
   "author": "walt.id",
   "license": "Apache-2.0",
+  "dependencies": {
+    "@waltid/dc-client": "file:../dc-client"
+  },
   "devDependencies": {
     "@waltid/dc-mock-utils": "file:../dc-mock-utils",
     "typescript": "^5.4.0",

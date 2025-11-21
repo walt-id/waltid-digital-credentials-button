@@ -7,8 +7,9 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build:mocks && npm run build:wc",
+    "build": "npm run build:mocks && npm run build:client && npm run build:wc",
     "build:mocks": "npm run build --workspace packages/dc-mock-utils",
+    "build:client": "npm run build --workspace packages/dc-client",
     "build:wc": "npm run build --workspace packages/digital-credentials",
     "dev:web": "npm run dev --workspace apps/web-demo",
     "dev:react": "npm run dev --workspace apps/react-demo",
