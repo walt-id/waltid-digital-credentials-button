@@ -14,7 +14,7 @@ npm install @waltid/digital-credentials
 </script>
 
 <digital-credentials-button
-  config-endpoint="/api/dc/config"
+  config-endpoint="/api/dc/request"
   label="Request credentials"
 ></digital-credentials-button>
 ```
@@ -27,7 +27,7 @@ Events:
 
 Attributes / properties:
 
-- `config-endpoint` (required) — backend endpoint for both the config fetch and credential post
+- `config-endpoint` (required) — backend endpoint for both the request fetch and credential post
 - `label` (optional) — button text (default: `Request credentials`)
 - `method` (optional) — HTTP verb used when posting the credential (default: `POST`)
 
@@ -59,26 +59,25 @@ npm run dev:react
 npm run dev:vue
 ```
 
-Each dev server exposes `GET/POST /api/dc/config` using the shared fixtures so the button works immediately.
+Each dev server exposes `GET/POST /api/dc/request` using the shared fixtures so the button works immediately.
 
 ## Mocking
 
 All demos call `installMocks()` from `@waltid/dc-mock-utils/install-mocks`, which:
 
 - stubs `navigator.credentials.get` with `fixtures/unsigned-mdl-response.json`
-- mocks `GET /api/dc/config` with `fixtures/unsigned-mdl-request.json`
+- mocks `GET /api/dc/request` with `fixtures/unsigned-mdl-request.json`
 - echoes credential submissions with `fixtures/credentials-response.json`
 
 Toggle the mock via `?dc-mock=1` / `?dc-mock=0` or the UI toggle (persisted to `localStorage: dc-mock-enabled`).
 
 ## App logic
 
-1.) The DC API Request (Credential query) should be loaded when hitting the button from the config endpoint by passing a configurationId: "GET /api/dc/config/${configurationId}" e.g.: "GET /api/dc/config/unsigned-mdl-request". And the response is logged. This should be done when mock mode is enabled or not. If mock mode is enabled then file unsigned-mdl-response.json is returned. If mock mode is enabled, then the reald backend at POST https://verifier2.portal.test.waltid.cloud/verification-session/create is called, and the sessionId e.g. "sessionId": "e102ecf7-0ecc-4085-85a7-6690ef1cfb1f" stored in the middleware in memory. Afterwards, another backend endpoint is called at: POST https://verifier2.portal.test.waltid.cloud/verification-session/<sessionId>/request using the sessionId from before. The result is the response from the middleware, the DC API Request, that is then sent to the DC API in the next step
+1.) The DC API Request (Credential query) should be loaded when hitting the button from the request endpoint by passing a configurationId: "GET /api/dc/request/${configurationId}" e.g.: "GET /api/dc/request/unsigned-mdl-request". And the response is logged. This should be done when mock mode is enabled or not. If mock mode is enabled then file unsigned-mdl-response.json is returned. If mock mode is enabled, then the real backend at POST https://verifier2.portal.test.waltid.cloud/verification-session/create is called, and the sessionId e.g. "sessionId": "e102ecf7-0ecc-4085-85a7-6690ef1cfb1f" stored in the middleware in memory. Afterwards, another backend endpoint is called at: POST https://verifier2.portal.test.waltid.cloud/verification-session/<sessionId>/request using the sessionId from before. The result is the response from the middleware, the DC API Request, that is then sent to the DC API in the next step
 
 2.) This request is then sent to the DC API, but only if mock mode is disabled. 
 
 3.) In case of success or failure the response from the DC API should be logged. When mock mode is enabled, the response unsigned-mdl-response.json should be logged.
 
 4.) In case of success, as well as when mock mode is enabled, the response is sent to the backend at POST /api/dc/response. This endpoint is currently missing. So please add this one. This is the place where the backend validates the credential. When mock mode is disabled, the application should call the real backend at https://verifier2.portal.test.waltid.cloud/verification-session/<sessionId>/response and return the value to the client, where it is logged. When mock mode is enabled, then the credentials-response.json is returnend.
-
 

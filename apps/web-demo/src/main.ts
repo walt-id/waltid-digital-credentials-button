@@ -1,13 +1,13 @@
 import {
   installMocks,
-  CONFIG_ENDPOINT,
+  REQUEST_ENDPOINT,
   RESPONSE_ENDPOINT,
   MOCK_FLAG_KEY
 } from '@waltid/dc-mock-utils/install-mocks';
 import dcApiMockResponse from '../../../fixtures/unsigned-mdl-response.json' assert { type: 'json' };
 import './style.css';
 
-const CONFIGURATION_ID = 'unsigned-mdl';
+const REQUEST_ID = 'unsigned-mdl';
 const logEl = document.getElementById('log') as HTMLPreElement | null;
 const btn = document.getElementById('demo-btn') as HTMLButtonElement | null;
 const mockStatus = document.getElementById('mock-status');
@@ -22,7 +22,7 @@ btn?.addEventListener('click', async () => {
   logLine('[started] credential-request-started');
 
   try {
-    const dcRequest = await fetchDcRequest(CONFIGURATION_ID, mockEnabled);
+    const dcRequest = await fetchDcRequest(REQUEST_ID, mockEnabled);
     logJson('Digital Credentials API request', dcRequest);
 
     const dcResponse = mockEnabled ? clone(dcApiMockResponse) : await requestCredential(dcRequest);
@@ -47,7 +47,7 @@ function setLoading(next: boolean): void {
 }
 
 async function fetchDcRequest(configId: string, mockEnabled: boolean): Promise<unknown> {
-  const url = withMockFlag(new URL(`${CONFIG_ENDPOINT}/${configId}`, window.location.origin), mockEnabled);
+  const url = withMockFlag(new URL(`${REQUEST_ENDPOINT}/${configId}`, window.location.origin), mockEnabled);
   const response = await fetch(url, {
     method: 'GET',
     headers: {

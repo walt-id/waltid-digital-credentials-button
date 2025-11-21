@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CONFIG_ENDPOINT, MOCK_FLAG_KEY } from '@waltid/dc-mock-utils/install-mocks';
+import { REQUEST_ENDPOINT, MOCK_FLAG_KEY } from '@waltid/dc-mock-utils/install-mocks';
 
 export default function App() {
   const btnRef = useRef<HTMLElement | null>(null);
@@ -72,7 +72,7 @@ export default function App() {
       <section className="card">
         <digital-credentials-button
           ref={btnRef}
-          config-endpoint={CONFIG_ENDPOINT}
+          config-endpoint={REQUEST_ENDPOINT}
           label="Request credentials"
         ></digital-credentials-button>
 

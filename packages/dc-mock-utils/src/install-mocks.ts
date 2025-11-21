@@ -2,7 +2,7 @@ import configPayload from '../../../fixtures/unsigned-mdl-request.json' assert {
 import dcApiResponse from '../../../fixtures/unsigned-mdl-response.json' assert { type: 'json' };
 import backendResponse from '../../../fixtures/unsigned-mdl-verified.json' assert { type: 'json' };
 
-export const CONFIG_ENDPOINT = '/api/dc/config';
+export const REQUEST_ENDPOINT = '/api/dc/request';
 export const RESPONSE_ENDPOINT = '/api/dc/response';
 export const MOCK_FLAG_KEY = 'dc-mock-enabled';
 
@@ -29,12 +29,12 @@ function patchFetch(): void {
   window.fetch = async (input: FetchInput, init: RequestInit = {}) => {
     const method = (init.method || 'GET').toUpperCase();
     const target = resolveUrl(input);
-    const mockResponse = method === 'GET' && target.pathname.startsWith(CONFIG_ENDPOINT);
+    const mockResponse = method === 'GET' && target.pathname.startsWith(REQUEST_ENDPOINT);
     if (mockResponse) {
       return jsonResponse(configPayload);
     }
     const isResponseEndpoint =
-      target.pathname.startsWith(RESPONSE_ENDPOINT) || target.pathname.startsWith(CONFIG_ENDPOINT);
+      target.pathname.startsWith(RESPONSE_ENDPOINT) || target.pathname.startsWith(REQUEST_ENDPOINT);
     if (isResponseEndpoint && method !== 'GET') {
       const bodyText = await readBody(init.body);
       const body = bodyText ? safeParse(bodyText) : null;

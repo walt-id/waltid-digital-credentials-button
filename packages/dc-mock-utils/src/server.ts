@@ -14,7 +14,7 @@ const verificationFixturePath = resolve(fixturesDir, 'unsigned-mdl-verified.json
 
 const VERIFIER_BASE = 'https://verifier2.portal.test.waltid.cloud';
 const RESPONSE_ENDPOINT = '/api/dc/response';
-const CONFIG_ENDPOINT = '/api/dc/config';
+const REQUEST_ENDPOINT = '/api/dc/request';
 
 export interface DcMockPluginOptions {
   configPath?: string;
@@ -29,15 +29,15 @@ export function dcMockPlugin(options: DcMockPluginOptions = {}): Plugin {
   const sessionStore = new Map<string, string>();
 
   return {
-    name: 'dc-config-endpoint',
+    name: 'dc-request-endpoint',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         if (!req.url) return next();
         const url = new URL(req.url, 'http://localhost');
-        const isConfig = url.pathname.startsWith(CONFIG_ENDPOINT);
+        const isRequest = url.pathname.startsWith(REQUEST_ENDPOINT);
         const isResponse = url.pathname.startsWith(RESPONSE_ENDPOINT);
 
-        if (!isConfig && !isResponse) {
+        if (!isRequest && !isResponse) {
           return next();
         }
 
@@ -45,7 +45,7 @@ export function dcMockPlugin(options: DcMockPluginOptions = {}): Plugin {
           const mock = isMockRequest(url, req);
           const configId = getConfigurationId(url);
 
-          if (req.method?.toUpperCase() === 'GET' && isConfig) {
+          if (req.method?.toUpperCase() === 'GET' && isRequest) {
             if (mock) {
               return sendJsonFile(configPath, res);
             }
@@ -53,7 +53,7 @@ export function dcMockPlugin(options: DcMockPluginOptions = {}): Plugin {
             return sendJson(res, dcRequest);
           }
 
-          if (req.method?.toUpperCase() === 'POST' && (isConfig || isResponse)) {
+          if (req.method?.toUpperCase() === 'POST' && (isRequest || isResponse)) {
             const payload = await readJsonBody(req);
 
             if (mock) {
@@ -100,7 +100,7 @@ function isTruthy(value: string): boolean {
 }
 
 function getConfigurationId(url: URL): string {
-  const pathname = url.pathname.replace(CONFIG_ENDPOINT, '');
+  const pathname = url.pathname.replace(REQUEST_ENDPOINT, '');
   const parts = pathname.split('/').filter(Boolean);
   return parts[0] ?? 'default';
 }

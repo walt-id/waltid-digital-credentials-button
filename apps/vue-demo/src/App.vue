@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { CONFIG_ENDPOINT, MOCK_FLAG_KEY } from '@waltid/dc-mock-utils/install-mocks';
+import { REQUEST_ENDPOINT, MOCK_FLAG_KEY } from '@waltid/dc-mock-utils/install-mocks';
 
-const configEndpoint = CONFIG_ENDPOINT;
+const configEndpoint = REQUEST_ENDPOINT;
 const btnRef = ref<HTMLElement | null>(null);
 const logEntries = ref<string[]>([]);
 const mockEnabled = ref(getMockEnabled());
