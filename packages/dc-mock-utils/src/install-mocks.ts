@@ -48,12 +48,9 @@ function patchFetch(): void {
     const isResponseEndpoint =
       target.pathname.startsWith(RESPONSE_ENDPOINT) || target.pathname.startsWith(REQUEST_ENDPOINT);
     if (isResponseEndpoint && method !== 'GET') {
-      const bodyText = await readBody(init.body);
-      const body = bodyText ? safeParse(bodyText) : null;
       return jsonResponse({
         ...(fixtures.verified as Record<string, unknown>),
-        success: (fixtures.verified as Record<string, unknown>)?.success ?? true,
-        echo: body
+        success: (fixtures.verified as Record<string, unknown>)?.success ?? true
       });
     }
 

@@ -81,3 +81,6 @@ Toggle the mock via `?dc-mock=1` / `?dc-mock=0` or the UI toggle (persisted to `
 
 4.) In case of success, as well as when mock mode is enabled, the response is sent to the backend at POST /api/dc/response. This endpoint is currently missing. So please add this one. This is the place where the backend validates the credential. When mock mode is disabled, the application should call the real backend at https://verifier2.portal.test.waltid.cloud/verification-session/<sessionId>/response and return the value to the client, where it is logged. When mock mode is enabled, then the credentials-response.json is returnend.
 
+
+
+The implementation of the web-demo is good now. Please apply now all changes, the usage of the new Web Component, as well as the UI/UX changes of the web-demo to the react and the vue demo.
