@@ -1,12 +1,56 @@
-# Digital Credentials Button
+# Digital Credentials Button Monorepo
 
-A web component that asks your backend for a Digital Credentials API request, calls `navigator.credentials.get`, and posts the returned credential back for verification.
+This repo packages a reusable web component for the Digital Credentials API and three demos (vanilla, React, Vue) that showcase mocked and real flows, plus shared mock utilities and fixtures.
 
-## Package usage
+## Packages
+
+- `@waltid/digital-credentials` — Web Component
+  - `<digital-credentials-button>` that fetches a DC request, calls `navigator.credentials.get`, and posts the response to your backend.
+  - Props/attrs: `request-id` (e.g., `unsigned-mdl`), `request-endpoint` (default `/api/dc/request`), `response-endpoint` (default `/api/dc/response`), `mock` (`true|false`), `label`.
+  - Events: `credential-request-started`, `credential-request-loaded`, `credential-dcapi-success`, `credential-dcapi-error`, `credential-verification-success`, `credential-verification-error`, `credential-error`, `credential-finished`.
+- `@waltid/dc-client` — core logic (no UI) to load a request, invoke DC API, and post verification.
+- `@waltid/dc-mock-utils` — dev server plugin + browser mock helper; serves fixtures from `fixtures/` and stubs `navigator.credentials.get` when `dc-mock=1`.
+
+## Demos
+
+- `apps/web-demo` — vanilla HTML/TS demo with UI controls:
+  - Request selector (`request-id`), mock toggle (`dc-mock` persisted), show-credential toggle, clear log.
+  - Uses `<digital-credentials-button>` wired to `/api/dc/request` and `/api/dc/response`.
+  - Renders a driving-license-styled modal on verification success (mock or real) with key fields.
+  - Logs request/response/error events; logs a clear error if DC API is unsupported while mock is off.
+- `apps/react-demo` — same UX in React.
+- `apps/vue-demo` — same UX in Vue.
+
+Mock mode defaults to off unless `?dc-mock=1` or `localStorage: dc-mock-enabled` is set. Toggling mock updates the URL and reloads so mocks take effect.
+
+## Endpoints & fixtures
+
+- Request endpoint: `/api/dc/request/:requestId` (also accepts `?request-id=`). Fixtures live in `fixtures/` as `<id>-request.json`.
+- Verification endpoint: `/api/dc/response` (uses `<id>-verified.json` in mock mode).
+- DC API mock response: `<id>-response.json`.
+- Additional configs for real verifier sessions reside in `apps/config/*-conf.json` (used by the dev server plugin when mock is off).
+
+Available `request-id`s (fixtures included):
+- `unsigned-mdl`
+- `signed-mdl`
+- `unsigned-photoid`
+- `signed-photoid`
+
+## Quick start
 
 ```bash
-npm install @waltid/digital-credentials
+npm install
+npm run build              # builds mocks, core, component
+
+# run a demo (one at a time)
+npm run dev:web
+npm run dev:react
+npm run dev:vue
 ```
+
+Then open the served URL (Vite defaults to port 5173). Use the UI toggles to switch request-id, mock mode, and credential display.
+
+## Using the component
 
 ```html
 <script type="module">
@@ -14,73 +58,48 @@ npm install @waltid/digital-credentials
 </script>
 
 <digital-credentials-button
-  config-endpoint="/api/dc/request"
+  request-id="unsigned-mdl"
+  request-endpoint="/api/dc/request"
+  response-endpoint="/api/dc/response"
   label="Request credentials"
 ></digital-credentials-button>
 ```
 
-Events:
+### Styling
+Target parts: `::part(button)` and `::part(status)`. The demos include an icon/gradient example in their CSS.
 
-- `credential-request-started`
-- `credential-received` (`detail: { credential, backendResponse }`)
-- `credential-error` (`detail: { stage, error }`)
+### Events
+Listen for lifecycle events to integrate with your app:
 
-Attributes / properties:
-
-- `config-endpoint` (required) — backend endpoint for both the request fetch and credential post
-- `label` (optional) — button text (default: `Request credentials`)
-- `method` (optional) — HTTP verb used when posting the credential (default: `POST`)
-
-## Repository layout
-
-- `packages/digital-credentials` — the web component source, build config, and types
-- `packages/dc-mock-utils` — shared `installMocks()` helper and Vite dev-server plugin
-- `fixtures/` — shared JSON files for the mock flows
-- `apps/web-demo` — frameworkless demo that mirrors the original sample
-- `apps/react-demo` — React demo using the custom element in JSX
-- `apps/vue-demo` — Vue demo using the custom element in templates
-
-## Local development
-
-```bash
-npm install
-
-# Build the web component
-npm run build
-
-# Build demos
-npm run build --workspace apps/web-demo
-npm run build --workspace apps/react-demo
-npm run build --workspace apps/vue-demo
-
-# Run a demo (pick one)
-npm run dev:web
-npm run dev:react
-npm run dev:vue
+```js
+el.addEventListener('credential-request-loaded', (e) => console.log(e.detail.payload));
+el.addEventListener('credential-verification-success', (e) => console.log(e.detail.response));
+el.addEventListener('credential-error', (e) => console.error(e.detail));
 ```
 
-Each dev server exposes `GET/POST /api/dc/request` using the shared fixtures so the button works immediately.
+## Mock helpers
 
-## Mocking
+To enable mocks in your own app:
+```js
+import { installMocks } from '@waltid/dc-mock-utils/install-mocks';
+installMocks(); // respects ?dc-mock=1 and localStorage: dc-mock-enabled
+```
 
-All demos call `installMocks()` from `@waltid/dc-mock-utils/install-mocks`, which:
+Or use the Vite plugin `dcMockPlugin` from `@waltid/dc-mock-utils` to serve fixtures on `/api/dc/request` and `/api/dc/response` in dev.
 
-- stubs `navigator.credentials.get` with `fixtures/unsigned-mdl-response.json`
-- mocks `GET /api/dc/request` with `fixtures/unsigned-mdl-request.json`
-- echoes credential submissions with `fixtures/credentials-response.json`
+## Notes on real vs mock
 
-Toggle the mock via `?dc-mock=1` / `?dc-mock=0` or the UI toggle (persisted to `localStorage: dc-mock-enabled`).
+- Mock on (`dc-mock=1`): all network calls are stubbed with fixtures; DC API is stubbed too.
+- Mock off: dev server proxies to real verifier endpoints using configs in `apps/config`; DC API must be available in the browser. The demos log a clear error if it’s not.
 
-## App logic
+## Scripts
 
-1.) The DC API Request (Credential query) should be loaded when hitting the button from the request endpoint by passing a configurationId: "GET /api/dc/request/${configurationId}" e.g.: "GET /api/dc/request/unsigned-mdl-request". And the response is logged. This should be done when mock mode is enabled or not. If mock mode is enabled then file unsigned-mdl-response.json is returned. If mock mode is enabled, then the real backend at POST https://verifier2.portal.test.waltid.cloud/verification-session/create is called, and the sessionId e.g. "sessionId": "e102ecf7-0ecc-4085-85a7-6690ef1cfb1f" stored in the middleware in memory. Afterwards, another backend endpoint is called at: POST https://verifier2.portal.test.waltid.cloud/verification-session/<sessionId>/request using the sessionId from before. The result is the response from the middleware, the DC API Request, that is then sent to the DC API in the next step
+- `npm run build` — builds mock utils, core client, and web component.
+- `npm run build:mocks` — mock utils only.
+- `npm run build:client` — core client only.
+- `npm run build:wc` — web component only.
+- `npm run dev:web|react|vue` — run respective demo.
 
-2.) This request is then sent to the DC API, but only if mock mode is disabled. 
+## License
 
-3.) In case of success or failure the response from the DC API should be logged. When mock mode is enabled, the response unsigned-mdl-response.json should be logged.
-
-4.) In case of success, as well as when mock mode is enabled, the response is sent to the backend at POST /api/dc/response. This endpoint is currently missing. So please add this one. This is the place where the backend validates the credential. When mock mode is disabled, the application should call the real backend at https://verifier2.portal.test.waltid.cloud/verification-session/<sessionId>/response and return the value to the client, where it is logged. When mock mode is enabled, then the credentials-response.json is returnend.
-
-
-
-The implementation of the web-demo is good now. Please apply now all changes, the usage of the new Web Component, as well as the UI/UX changes of the web-demo to the react and the vue demo.
+Apache-2.0.
