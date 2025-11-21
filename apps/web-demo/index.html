@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Digital Credentials Button — Web Demo</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Digital Credentials Button</h1>
+      <p class="lead">
+        A minimal web component that fetches a Digital Credentials API request from a backend,
+        calls <code>navigator.credentials.get</code>, and posts the result back.
+      </p>
+
+      <section class="card" style="margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <strong>Mock mode</strong>
+          <span id="mock-status"></span>
+          <button id="mock-toggle">Toggle mock</button>
+          <small style="color:#475569;">Uses builtin JSON fixtures when enabled.</small>
+        </div>
+      </section>
+
+      <section class="card">
+        <button id="demo-btn" type="button" class="dc-btn">Request credentials</button>
+
+        <h3>Event log</h3>
+        <pre id="log">(click the button to start)</pre>
+      </section>
+    </main>
+  </body>
+</html>
