@@ -10,7 +10,7 @@ body {
 }
 
 main {
-  max-width: 720px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 48px 24px 64px;
 }
@@ -40,4 +40,238 @@ pre {
   border-radius: 12px;
   overflow: auto;
   font-size: 0.9rem;
+}
+
+.dc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.5rem;
+  border: 1px solid #0f172a;
+  background: #111827;
+  color: #f8fafc;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  min-height: 40px;
+}
+
+.dc-btn:hover:not(:disabled) {
+  background: #0b1220;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.2);
+}
+
+.dc-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  box-shadow: none;
+}
+
+.dc-btn-secondary {
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+}
+
+.dc-btn-secondary:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: none;
+  transform: none;
+}
+
+digital-credentials-button::part(button) {
+  min-width: 240px;
+  width: 240px;
+  white-space: nowrap;
+  padding: 0.7rem 0.95rem 0.7rem 0.85rem;
+  background: linear-gradient(135deg, #0f172a, #111827 55%, #0f172a);
+  border: 1px solid #0f172a;
+  color: #f8fafc;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.25);
+  gap: 0.5rem;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+digital-credentials-button::part(button)::before {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5 3.8 9.4 8 11 4.2-1.6 8-6 8-11V5l-8-3Zm0 2.2 6 2.3v4.5c0 3.8-2.7 7.8-6 9.3-3.3-1.5-6-5.5-6-9.3V6.5l6-2.3ZM11 7v6l5-3-5-3Z"/></svg>') no-repeat center / contain;
+  background: currentColor;
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 26px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #e2e8f0;
+  transition: 0.2s;
+  border-radius: 999px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: '';
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.toggle input:checked + .toggle-slider {
+  background-color: #10b981;
+}
+
+.toggle input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal-backdrop[hidden] {
+  display: none !important;
+}
+
+.modal {
+  width: min(560px, 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 40%, #f8fafc 100%);
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  border: 1px solid #dce3ec;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.license-card {
+  color: #0f172a;
+}
+
+.license-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: #e2e8f0;
+  border-bottom: 1px solid #dce3ec;
+}
+
+.license-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+
+.license-header button {
+  background: transparent;
+  border: none;
+  color: #0f172a;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.license-body {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 16px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.license-photo {
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.license-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.field .label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #475569;
+}
+
+.field .value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.field.muted {
+  opacity: 0.8;
+}
+
+.license-footer {
+  padding: 12px 16px 16px;
+  font-size: 0.9rem;
+  color: #475569;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.issuer {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  border: 1px solid #dce3ec;
+  color: #0f172a;
 }
