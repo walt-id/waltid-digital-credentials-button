@@ -12,7 +12,7 @@ COPY package.json package-lock.json ./
 COPY packages packages
 COPY apps apps
 COPY fixtures fixtures
-COPY tsconfig.json tsconfig.build.json vite.config.ts ./
+COPY vite.config.ts ./
 RUN npm ci
 
 # Build shared packages and the web demo
