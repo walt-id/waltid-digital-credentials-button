@@ -9,10 +9,13 @@ WORKDIR /app
 
 # Install dependencies
 COPY package.json package-lock.json ./
-COPY packages packages
-COPY apps apps
+COPY packages/dc-client packages/dc-client
+COPY packages/dc-mock-utils packages/dc-mock-utils
+COPY packages/digital-credentials packages/digital-credentials
+COPY apps/web-demo apps/web-demo
+COPY apps/config apps/config
 COPY fixtures fixtures
-COPY vite.config.ts ./
+
 RUN npm ci
 
 # Build shared packages and the web demo

@@ -13,11 +13,22 @@ Simple Vite demo for `<digital-credentials-button>`. Builds to static assets and
 - Build the demo bundle: `npm run build --workspace apps/web-demo`
 - Output lands in `apps/web-demo/dist`; serve it with any static server (e.g., `npm run preview --workspace apps/web-demo`).
 
-## Docker image
-- Build (from repo root): `docker build -t waltid/digital-credentias -f apps/web-demo/Dockerfile .`
+## Docker images
+
+### Production (static, no mock server)
+- Build (from repo root): `docker build -t waltid/digital-credentials -f apps/web-demo/Dockerfile .`
+- Run: `docker run --rm -p 8080:80 waltid/digital-credentials`
+- Access at `http://localhost:8080`. This serves the built static assets via nginx; you must provide real `/api/dc/request` and `/api/dc/response` endpoints (same origin or adjust component attributes).
+
+### Mock/dev (includes mock backend)
+- Build (from repo root): `docker build -t waltid/digital-credentias -f apps/web-demo/Dockerfile-mock .`
 - Run: `docker run --rm -p 8080:80 waltid/digital-credentias`
-- Access at `http://localhost:8080`. Use `?dc-mock=1` to run entirely with mocked endpoints/DC API.
+- Access at `http://localhost:8080`. Runs the Vite dev server (0.0.0.0:80) with `dcMockPlugin`, so `/api/dc/request` and `/api/dc/response` are served from the container.
+- Use `?dc-mock=1` (or the UI toggle) to force fixture responses and stubbed DC API; leave it off to call a real verifier.
+- Optional: set `VERIFIER_BASE=https://verifier.example.com` to point the mock middleware at your verifier.
+- If you serve this under a custom hostname, set `ALLOWED_HOSTS=<host1,host2>` when running the container; `digital-credentials.walt.id` is allowed by default.
 
 ### Backend connectivity
-- The demo expects `/api/dc/request` and `/api/dc/response` on the same origin. When running the container, proxy or expose your backend at those paths (or adjust the attributes in `src/main.ts` if you need different endpoints).
-- For real verifier traffic, your backend should forward to your configured verifier base; for local testing you can stay on mocks with `?dc-mock=1`.
+- Production image: provide `/api/dc/request` and `/api/dc/response` yourself (same origin or update `request-endpoint`/`response-endpoint` attributes).
+- Mock image: endpoints are provided in-container. For real verifier traffic with the mock image, set `VERIFIER_BASE` and leave `dc-mock` off; the middleware will create sessions and forward responses.
+- To use an external backend with either image, adjust the component attributes in `src/main.ts` or at runtime.

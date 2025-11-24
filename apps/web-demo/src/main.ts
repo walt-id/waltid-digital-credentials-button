@@ -49,29 +49,29 @@ function init(): void {
     if (dcButton) {
       dcButton.addEventListener('credential-request-started', (event) => {
         hideCredentialModal();
-        logLine(
-          `[started] credential-request-started (${(event as CustomEvent).detail?.requestId ?? REQUEST_ID})`
-        );
-        console.log('checking DC API support.sdfsdf..');
+        const requestId = (event as CustomEvent).detail?.requestId ?? REQUEST_ID;
+        logLineWithConsole(`[started] credential-request-started (${requestId})`);
+        console.log('checking DC API support.digital-credentials ...');
         maybeLogUnsupported();
       });
       dcButton.addEventListener('credential-request-loaded', (event) =>
-        logJson('Digital Credentials API request', (event as CustomEvent).detail?.payload)
+        logJsonWithConsole('Digital Credentials API request loaded', (event as CustomEvent).detail?.payload)
       );
-      dcButton.addEventListener('credential-dcapi-success', (event) =>
-        logDcResponse((event as CustomEvent).detail?.response)
-      );
+      dcButton.addEventListener('credential-dcapi-success', (event) => {
+        logDcResponse((event as CustomEvent).detail?.response);
+        logLineWithConsole('DC API succeeded; sending response for verification...');
+      });
       dcButton.addEventListener('credential-dcapi-error', (event) =>
-        logJson('[error:dc-api]', (event as CustomEvent).detail?.error)
+        logJsonWithConsole('[error:dc-api]', (event as CustomEvent).detail?.error)
       );
       dcButton.addEventListener('credential-verification-success', (event) =>
         handleVerificationSuccess((event as CustomEvent).detail?.response)
       );
       dcButton.addEventListener('credential-verification-error', (event) =>
-        logJson('[error:verification]', (event as CustomEvent).detail?.error)
+        logJsonWithConsole('[error:verification]', (event as CustomEvent).detail?.error)
       );
       dcButton.addEventListener('credential-error', (event) =>
-        logJson('[error]', (event as CustomEvent).detail)
+        logJsonWithConsole('[error]', (event as CustomEvent).detail)
       );
     }
 
@@ -136,10 +136,20 @@ function init(): void {
     renderLog();
   }
 
+  function logLineWithConsole(message: string): void {
+    console.log('[dc-demo]', message);
+    logLine(message);
+  }
+
   function logJson(label: string, payload: unknown): void {
     const pretty = JSON.stringify(payload, null, 2);
     logEntries.push(`${label}:\n${pretty}`);
     renderLog();
+  }
+
+  function logJsonWithConsole(label: string, payload: unknown): void {
+    console.log('[dc-demo]', label, payload);
+    logJson(label, payload);
   }
 
   function getMockEnabled(): boolean {
@@ -187,14 +197,14 @@ function init(): void {
 
   function logDcResponse(response: unknown): void {
     if (getShowCredentialEnabled()) {
-      logJson('Digital Credentials API response', response);
+      logJsonWithConsole('Digital Credentials API response', response);
     } else {
-      logJson('Digital Credentials API response', { hidden: true });
+      logJsonWithConsole('Digital Credentials API response', { hidden: true });
     }
   }
 
   function handleVerificationSuccess(response: unknown): void {
-    logJson('Credential Verification response', response);
+    logJsonWithConsole('Credential Verification response', response);
     if (getShowCredentialEnabled()) {
       showCredentialModal(response);
     }
