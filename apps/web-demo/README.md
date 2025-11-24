@@ -25,8 +25,13 @@ Simple Vite demo for `<digital-credentials-button>`. Builds to static assets and
 - Run: `docker run --rm -p 8080:80 waltid/digital-credentias`
 - Access at `http://localhost:8080`. Runs the Vite dev server (0.0.0.0:80) with `dcMockPlugin`, so `/api/dc/request` and `/api/dc/response` are served from the container.
 - Use `?dc-mock=1` (or the UI toggle) to force fixture responses and stubbed DC API; leave it off to call a real verifier.
-- Optional: set `VERIFIER_BASE=https://verifier.example.com` to point the mock middleware at your verifier.
+
+Optional:
+- Set `VERIFIER_BASE=https://verifier.example.com` to point the mock middleware at your verifier.
 - If you serve this under a custom hostname, set `ALLOWED_HOSTS=<host1,host2>` when running the container; `digital-credentials.walt.id` is allowed by default.
+```
+docker run --rm -p 8080:80 -e VERIFIER_BASE=https://verifier.example.com -e ALLOWED_HOSTS=your.host waltid/digital-credentias
+```
 
 ### Backend connectivity
 - Production image: provide `/api/dc/request` and `/api/dc/response` yourself (same origin or update `request-endpoint`/`response-endpoint` attributes).

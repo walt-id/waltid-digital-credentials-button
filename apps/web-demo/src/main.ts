@@ -28,6 +28,7 @@ function init(): void {
   const dlIssuer = document.getElementById('dl-issuer');
 
   installMocks();
+  enableFetchLogging();
   primeButton();
   renderLog();
   wireEvents();
@@ -150,6 +151,79 @@ function init(): void {
   function logJsonWithConsole(label: string, payload: unknown): void {
     console.log('[dc-demo]', label, payload);
     logJson(label, payload);
+  }
+
+  function enableFetchLogging(): void {
+    const originalFetch = window.fetch.bind(window);
+
+    window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const method = (init.method || 'GET').toUpperCase();
+      const target = resolveUrl(input);
+      const shouldLog =
+        target.pathname.startsWith('/api/dc/') || target.pathname.includes('/verification-session/');
+
+      if (shouldLog) {
+        logLineWithConsole(`[fetch] ${method} ${target.pathname}${target.search}`);
+        if (init.body) {
+          const bodyText = await bodyToString(init.body);
+          if (bodyText) logLineWithConsole(`[fetch] request body: ${bodyText}`);
+        }
+      }
+
+      try {
+        const response = await originalFetch(input as any, init);
+        if (shouldLog) {
+          let responseText = '';
+          try {
+            responseText = await response.clone().text();
+          } catch {
+            // ignore
+          }
+          logLineWithConsole(
+            `[fetch] response ${response.status} ${response.statusText || ''} for ${target.pathname}${target.search}`
+          );
+          if (responseText) {
+            logJsonWithConsole('[fetch] response body', safeParse(responseText));
+          }
+        }
+        return response;
+      } catch (error) {
+        if (shouldLog) {
+          logJsonWithConsole('[fetch] error', error);
+        }
+        throw error;
+      }
+    };
+
+    function resolveUrl(input: RequestInfo | URL): URL {
+      if (typeof input === 'string') return new URL(input, window.location.href);
+      if (input && typeof input === 'object' && 'url' in input) {
+        return new URL((input as Request).url, window.location.href);
+      }
+      return new URL(window.location.href);
+    }
+
+    async function bodyToString(body: BodyInit | null | undefined): Promise<string> {
+      if (!body) return '';
+      if (typeof body === 'string') return body;
+      if (body instanceof Blob) return await body.text();
+      if (body instanceof FormData) {
+        const payload: Record<string, unknown> = {};
+        for (const [key, value] of body.entries()) {
+          payload[key] = value;
+        }
+        return JSON.stringify(payload);
+      }
+      return '';
+    }
+
+    function safeParse(text: string): unknown {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return text;
+      }
+    }
   }
 
   function getMockEnabled(): boolean {
