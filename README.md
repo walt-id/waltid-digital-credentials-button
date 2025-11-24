@@ -87,6 +87,33 @@ installMocks(); // respects ?dc-mock=1 and localStorage: dc-mock-enabled
 
 Or use the Vite plugin `dcMockPlugin` from `@waltid/dc-mock-utils` to serve fixtures on `/api/dc/request` and `/api/dc/response` in dev.
 
+## Running with mocks
+
+- Demos honor `?dc-mock=1` (or `localStorage: dc-mock-enabled=true`); the demo UI toggles it for you and reloads so the mock fetch/DC API stubs take effect.
+- In your own app call `installMocks()` and visit with `?dc-mock=1`; it stubs both endpoints and `navigator.credentials.get` while keeping the same request/response URLs.
+- Vite dev server: include `dcMockPlugin` so `/api/dc/request` and `/api/dc/response` serve fixtures when mock is on.
+
+## Configuring the verifier base
+
+- Default base is `https://verifier2.portal.test.waltid.cloud`. Override with `VERIFIER_BASE` env when running Vite (`VERIFIER_BASE=https://verifier.yourdomain npm run dev:web`) or pass `verifierBase` to `dcMockPlugin`.
+- Example Vite usage:
+
+```ts
+// vite.config.ts
+import { dcMockPlugin } from '@waltid/dc-mock-utils';
+
+export default defineConfig({
+  plugins: [dcMockPlugin({ verifierBase: 'https://verifier.yourdomain' })]
+});
+```
+
+## Production integration
+
+- Point `<digital-credentials-button>` at your backend: set `request-endpoint` and `response-endpoint` to URLs you control; keep `request-id` to select which verifier config to use.
+- Backend flow: (1) `POST ${VERIFIER_BASE}/verification-session/create` with the config JSON you want (see `apps/config/*-conf.json` as templates), store `sessionId`; (2) `GET ${VERIFIER_BASE}/verification-session/{sessionId}/request` and return that JSON to the web component; (3) when the component POSTs the DC API result to your `response-endpoint`, forward it to `POST ${VERIFIER_BASE}/verification-session/{sessionId}/response` and return the verifier’s reply.
+- Keep `VERIFIER_BASE` (or your own config name) as an environment variable in production so you can point at different verifier deployments without code changes.
+- Use mocks only for local testing; leave `mock`/`dc-mock` off in production so real verifier traffic flows through your backend.
+
 ## Notes on real vs mock
 
 - Mock on (`dc-mock=1`): all network calls are stubbed with fixtures; DC API is stubbed too.

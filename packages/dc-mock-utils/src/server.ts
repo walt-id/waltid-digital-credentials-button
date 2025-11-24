@@ -12,7 +12,7 @@ const requestFixturePath = resolve(fixturesDir, 'unsigned-mdl-request.json');
 const dcApiFixturePath = resolve(fixturesDir, 'unsigned-mdl-response.json');
 const verificationFixturePath = resolve(fixturesDir, 'unsigned-mdl-verified.json');
 
-const VERIFIER_BASE = 'https://verifier2.portal.test.waltid.cloud';
+const DEFAULT_VERIFIER_BASE = 'https://verifier2.portal.test.waltid.cloud';
 const RESPONSE_ENDPOINT = '/api/dc/response';
 const REQUEST_ENDPOINT = '/api/dc/request';
 
@@ -20,6 +20,7 @@ export interface DcMockPluginOptions {
   configPath?: string;
   dcApiResponsePath?: string;
   backendResponsePath?: string;
+  verifierBase?: string;
 }
 
 export function dcMockPlugin(options: DcMockPluginOptions = {}): Plugin {
@@ -27,6 +28,7 @@ export function dcMockPlugin(options: DcMockPluginOptions = {}): Plugin {
   const dcApiResponsePath = options.dcApiResponsePath ?? dcApiFixturePath;
   const backendResponsePath = options.backendResponsePath ?? verificationFixturePath;
   const sessionStore = new Map<string, string>();
+  const verifierBase = resolveVerifierBase(options.verifierBase);
 
   return {
     name: 'dc-request-endpoint',
@@ -49,7 +51,7 @@ export function dcMockPlugin(options: DcMockPluginOptions = {}): Plugin {
             if (mock) {
               return sendJsonFile(configPath, res);
             }
-            const dcRequest = await fetchDcRequestFromBackend(configId, sessionStore);
+            const dcRequest = await fetchDcRequestFromBackend(configId, sessionStore, verifierBase);
             return sendJson(res, dcRequest);
           }
 
@@ -67,7 +69,7 @@ export function dcMockPlugin(options: DcMockPluginOptions = {}): Plugin {
               return;
             }
 
-            const verification = await postCredentialResponse(sessionId, payload);
+            const verification = await postCredentialResponse(sessionId, payload, verifierBase);
             return sendJson(res, verification);
           }
 
@@ -110,18 +112,18 @@ function getConfigurationId(url: URL): string {
 
 async function fetchDcRequestFromBackend(
   configurationId: string,
-  sessionStore: Map<string, string>
+  sessionStore: Map<string, string>,
+  verifierBase: string
 ): Promise<unknown> {
   console.log(`Fetching DC request for configurationId: ${configurationId}`);
-  const sessionId = await createSession(configurationId);
+  const sessionId = await createSession(configurationId, verifierBase);
   sessionStore.set(configurationId, sessionId);
-  return requestSessionPayload(sessionId);
+  return requestSessionPayload(sessionId, verifierBase);
 }
 
-async function createSession(configurationId: string): Promise<string> {
-  console.log(`Creating session for configurationId: ${configurationId}`);
+async function createSession(configurationId: string, verifierBase: string): Promise<string> {
   const sessionRequest = buildSessionCreatePayload(configurationId);
-  const response = await fetch(`${VERIFIER_BASE}/verification-session/create`, {
+  const response = await fetch(`${verifierBase}/verification-session/create`, {
     method: 'POST',
     headers: {
       accept: 'application/json',
@@ -129,9 +131,6 @@ async function createSession(configurationId: string): Promise<string> {
     },
     body: JSON.stringify(sessionRequest)
   });
-
-  console.log(`Session create response status: ${response.status}`);
-  console.log(`Session create response : ${JSON.stringify(response)}`);
 
 
   if (!response.ok) {
@@ -150,18 +149,15 @@ async function createSession(configurationId: string): Promise<string> {
 }
 
 function buildSessionCreatePayload(configurationId: string): unknown {
-
     const path = resolve(configDir, `${configurationId}-conf.json`);
     const raw = fs.readFileSync(path, 'utf8');
-    console.log(`raw ${raw}`);
     const sessionCreateConfig = JSON.parse(raw)
-    console.log(`sessionCreateConfig ${sessionCreateConfig}`);
     return sessionCreateConfig;
 }
 
-async function requestSessionPayload(sessionId: string): Promise<unknown> {
+async function requestSessionPayload(sessionId: string, verifierBase: string): Promise<unknown> {
   console.log(`Requesting session payload for sessionId: ${sessionId}`);
-  const response = await fetch(`${VERIFIER_BASE}/verification-session/${sessionId}/request`, {
+  const response = await fetch(`${verifierBase}/verification-session/${sessionId}/request`, {
     method: 'GET',
     headers: { 'content-type': 'application/json' }
   });
@@ -174,8 +170,12 @@ async function requestSessionPayload(sessionId: string): Promise<unknown> {
   return await response.json();
 }
 
-async function postCredentialResponse(sessionId: string, payload: unknown): Promise<unknown> {
-  const response = await fetch(`${VERIFIER_BASE}/verification-session/${sessionId}/response`, {
+async function postCredentialResponse(
+  sessionId: string,
+  payload: unknown,
+  verifierBase: string
+): Promise<unknown> {
+  const response = await fetch(`${verifierBase}/verification-session/${sessionId}/response`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload ?? {})
@@ -198,6 +198,10 @@ function getSessionId(configId: string, sessionStore: Map<string, string>): stri
   }
   const [, lastSessionId] = [...sessionStore].at(-1) ?? [];
   return lastSessionId;
+}
+
+function resolveVerifierBase(optionVerifierBase?: string): string {
+  return optionVerifierBase ?? process.env.VERIFIER_BASE ?? DEFAULT_VERIFIER_BASE;
 }
 
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
