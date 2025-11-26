@@ -8,6 +8,7 @@ import {
 type MinimalCredential = {
   givenName?: string;
   familyName?: string;
+  ageOver21?: boolean;
   date?: string;
   issuer?: string;
 };
@@ -198,11 +199,13 @@ const toggleMock = () => {
               <div className="license-fields">
                 <Field label="First Name" value={credential.givenName} />
                 <Field label="Family Name" value={credential.familyName} />
+                <Field
+                  label="Age over 21"
+                  value={
+                    credential.ageOver21 === undefined ? undefined : credential.ageOver21 ? 'Yes' : 'No'
+                  }
+                />
                 <Field label="Date" value={credential.date} />
-                <div className="field muted">
-                  <span className="label">Additional fields</span>
-                  <span className="value">Coming soon</span>
-                </div>
               </div>
             </div>
             <div className="license-footer">
@@ -260,6 +263,9 @@ function primeButton(btn: HTMLElement, requestId: string, mock: boolean): void {
 
 function extractFirstCredential(input: unknown): MinimalCredential {
   if (!input || typeof input !== 'object') return {};
+  const presented = extractFromPresentedCredentials(input);
+  if (presented) return presented;
+
   const asObj = input as { credentials?: unknown };
   const cred = Array.isArray(asObj.credentials) ? asObj.credentials[0] : (input as any);
   if (!cred || typeof cred !== 'object') return {};
@@ -269,5 +275,24 @@ function extractFirstCredential(input: unknown): MinimalCredential {
     familyName: claims['family_name']?.value ?? claims['family_name'] ?? undefined,
     date: claims['date_of_birth']?.value ?? claims['date_of_birth'] ?? undefined,
     issuer: (cred as any).issuerInfo?.commonName || (cred as any).issuer || undefined
+  };
+}
+
+function extractFromPresentedCredentials(input: unknown): MinimalCredential | null {
+  const data = input as {
+    presentedCredentials?: { my_mdl?: Array<{ credentialData?: Record<string, unknown> }> };
+  };
+  const first = Array.isArray(data.presentedCredentials?.my_mdl)
+    ? data.presentedCredentials?.my_mdl[0]
+    : undefined;
+  const isoData = first?.credentialData?.['org.iso.18013.5.1'];
+  if (!isoData || typeof isoData !== 'object') return null;
+  const claims = isoData as Record<string, unknown>;
+  const ageRaw = claims['age_over_21'] ?? claims['ageOver21'];
+
+  return {
+    givenName: (claims['given_name'] ?? claims['givenName']) as string | undefined,
+    familyName: (claims['family_name'] ?? claims['familyName']) as string | undefined,
+    ageOver21: typeof ageRaw === 'boolean' ? ageRaw : undefined
   };
 }

@@ -24,7 +24,7 @@ function init(): void {
   const modalClose = document.getElementById('modal-close') as HTMLButtonElement | null;
   const dlFirst = document.getElementById('dl-first-name');
   const dlFamily = document.getElementById('dl-family-name');
-  const dlDate = document.getElementById('dl-date');
+  const dlAge = document.getElementById('dl-age-over-21');
   const dlIssuer = document.getElementById('dl-issuer');
 
   installMocks();
@@ -183,7 +183,7 @@ function init(): void {
             `[fetch] response ${response.status} ${response.statusText || ''} for ${target.pathname}${target.search}`
           );
           if (responseText) {
-            logJsonWithConsole('[fetch] response body', safeParse(responseText));
+            //logJsonWithConsole('[fetch] response body', safeParse(responseText));
           }
         }
         return response;
@@ -298,11 +298,15 @@ function init(): void {
   }
 
   function showCredentialModal(data: unknown): void {
-    if (!modalBackdrop || !dlFirst || !dlFamily || !dlDate || !dlIssuer) return;
+    if (!modalBackdrop || !dlFirst || !dlFamily || !dlAge || !dlIssuer) return;
     const cred = extractFirstCredential(data);
     dlFirst.textContent = cred.givenName || '—';
     dlFamily.textContent = cred.familyName || '—';
-    dlDate.textContent = cred.date || '—';
+    if (typeof cred.ageOver21 === 'boolean') {
+      dlAge.textContent = cred.ageOver21 ? 'Yes' : 'No';
+    } else {
+      dlAge.textContent = '—';
+    }
     dlIssuer.textContent = `Issuer: ${cred.issuer || '—'}`;
     modalBackdrop.hidden = false;
     modalBackdrop.style.display = 'flex';
@@ -317,12 +321,15 @@ function init(): void {
   type MinimalCredential = {
     givenName?: string;
     familyName?: string;
-    date?: string;
+    ageOver21?: boolean;
     issuer?: string;
   };
 
   function extractFirstCredential(input: unknown): MinimalCredential {
     if (!input || typeof input !== 'object') return {};
+    const presented = extractFromPresentedCredentials(input);
+    if (presented) return presented;
+
     const asObj = input as { credentials?: unknown };
     const cred = Array.isArray(asObj.credentials) ? asObj.credentials[0] : (input as any);
     if (!cred || typeof cred !== 'object') return {};
@@ -330,8 +337,26 @@ function init(): void {
     return {
       givenName: claims['given_name']?.value ?? claims['given_name'] ?? undefined,
       familyName: claims['family_name']?.value ?? claims['family_name'] ?? undefined,
-      date: claims['date_of_birth']?.value ?? claims['date_of_birth'] ?? undefined,
       issuer: (cred as any).issuerInfo?.commonName || (cred as any).issuer || undefined
+    };
+  }
+
+  function extractFromPresentedCredentials(input: unknown): MinimalCredential | null {
+    const data = input as {
+      presentedCredentials?: { my_mdl?: Array<{ credentialData?: Record<string, unknown> }> };
+    };
+    const first = Array.isArray(data.presentedCredentials?.my_mdl)
+      ? data.presentedCredentials?.my_mdl[0]
+      : undefined;
+    const isoData = first?.credentialData?.['org.iso.18013.5.1'];
+    if (!isoData || typeof isoData !== 'object') return null;
+    const claims = isoData as Record<string, unknown>;
+    const ageRaw = claims['age_over_21'] ?? claims['ageOver21'];
+
+    return {
+      givenName: (claims['given_name'] ?? claims['givenName']) as string | undefined,
+      familyName: (claims['family_name'] ?? claims['familyName']) as string | undefined,
+      ageOver21: typeof ageRaw === 'boolean' ? ageRaw : undefined
     };
   }
 }

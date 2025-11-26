@@ -46,10 +46,15 @@ export function dcMockPlugin(options: DcMockPluginOptions = {}): Plugin {
         try {
           const mock = isMockRequest(url, req);
           const configId = getConfigurationId(url);
+          const fixtures = resolveFixturePaths(configId, {
+            request: configPath,
+            dcApiResponse: dcApiResponsePath,
+            verified: backendResponsePath
+          });
 
           if (req.method?.toUpperCase() === 'GET' && isRequest) {
             if (mock) {
-              return sendJsonFile(configPath, res);
+              return sendJsonFile(fixtures.request, res);
             }
             const dcRequest = await fetchDcRequestFromBackend(configId, sessionStore, verifierBase);
             return sendJson(res, dcRequest);
@@ -59,7 +64,7 @@ export function dcMockPlugin(options: DcMockPluginOptions = {}): Plugin {
             const payload = await readJsonBody(req);
 
             if (mock) {
-              return sendJsonFile(backendResponsePath, res);
+              return sendJsonFile(isRequest ? fixtures.dcApiResponse : fixtures.verified, res);
             }
 
             const sessionId = getSessionId(configId, sessionStore);
@@ -107,6 +112,25 @@ function getConfigurationId(url: URL): string {
   const pathname = url.pathname.replace(REQUEST_ENDPOINT, '');
   const parts = pathname.split('/').filter(Boolean);
   return parts[0] ?? 'unsigned-mdl';
+}
+
+type FixturePaths = {
+  request: string;
+  dcApiResponse: string;
+  verified: string;
+};
+
+function resolveFixturePaths(configId: string, defaults: FixturePaths): FixturePaths {
+  return {
+    request: resolveFixturePath(`${configId}-request.json`, defaults.request),
+    dcApiResponse: resolveFixturePath(`${configId}-response.json`, defaults.dcApiResponse),
+    verified: resolveFixturePath(`${configId}-verified.json`, defaults.verified)
+  };
+}
+
+function resolveFixturePath(filename: string, fallback: string): string {
+  const candidate = resolve(fixturesDir, filename);
+  return fs.existsSync(candidate) ? candidate : fallback;
 }
 
 

@@ -42,9 +42,9 @@
   "dcApi": true,
   "haip": false,
   "urlPrefix": null,
-  "urlHost": "http://localhost:7003",
+  "urlHost": "https://digital-credentials.walt.id",
   "expectedOrigins": [
-    "http://localhost:7003"
+    "https://digital-credentials.walt.id"
   ],
   "clientId": "x509_hash:abc-xyz-base64url-sha256-hash-of-der-x509-leaf"
 }

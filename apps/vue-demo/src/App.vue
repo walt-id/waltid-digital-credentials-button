@@ -5,6 +5,7 @@ import { REQUEST_ENDPOINT, RESPONSE_ENDPOINT, MOCK_FLAG_KEY } from '@waltid/dc-m
 type MinimalCredential = {
   givenName?: string;
   familyName?: string;
+  ageOver21?: boolean;
   date?: string;
   issuer?: string;
 };
@@ -165,6 +166,8 @@ function resolveShowCredential(): boolean {
 
 function extractFirstCredential(input: unknown): MinimalCredential {
   if (!input || typeof input !== 'object') return {};
+  const presented = extractFromPresentedCredentials(input);
+  if (presented) return presented;
   const asObj = input as { credentials?: unknown };
   const cred = Array.isArray(asObj.credentials) ? asObj.credentials[0] : (input as any);
   if (!cred || typeof cred !== 'object') return {};
@@ -174,6 +177,25 @@ function extractFirstCredential(input: unknown): MinimalCredential {
     familyName: claims['family_name']?.value ?? claims['family_name'] ?? undefined,
     date: claims['date_of_birth']?.value ?? claims['date_of_birth'] ?? undefined,
     issuer: (cred as any).issuerInfo?.commonName || (cred as any).issuer || undefined
+  };
+}
+
+function extractFromPresentedCredentials(input: unknown): MinimalCredential | null {
+  const data = input as {
+    presentedCredentials?: { my_mdl?: Array<{ credentialData?: Record<string, unknown> }> };
+  };
+  const first = Array.isArray(data.presentedCredentials?.my_mdl)
+    ? data.presentedCredentials?.my_mdl[0]
+    : undefined;
+  const isoData = first?.credentialData?.['org.iso.18013.5.1'];
+  if (!isoData || typeof isoData !== 'object') return null;
+  const claims = isoData as Record<string, unknown>;
+  const ageRaw = claims['age_over_21'] ?? claims['ageOver21'];
+
+  return {
+    givenName: (claims['given_name'] ?? claims['givenName']) as string | undefined,
+    familyName: (claims['family_name'] ?? claims['familyName']) as string | undefined,
+    ageOver21: typeof ageRaw === 'boolean' ? ageRaw : undefined
   };
 }
 </script>
@@ -261,12 +283,20 @@ function extractFirstCredential(input: unknown): MinimalCredential {
               <span class="value">{{ credential.familyName || '—' }}</span>
             </div>
             <div class="field">
+              <span class="label">Age over 21</span>
+              <span class="value">
+                {{
+                  credential.ageOver21 === undefined
+                    ? '—'
+                    : credential.ageOver21
+                      ? 'Yes'
+                      : 'No'
+                }}
+              </span>
+            </div>
+            <div class="field">
               <span class="label">Date</span>
               <span class="value">{{ credential.date || '—' }}</span>
-            </div>
-            <div class="field muted">
-              <span class="label">Additional fields</span>
-              <span class="value">Coming soon</span>
             </div>
           </div>
         </div>
