@@ -285,7 +285,14 @@ function init(): void {
   }
 
   function hasDcApiSupport(): boolean {
-    return typeof (window as { DigitalCredential?: unknown }).DigitalCredential !== 'undefined';
+    console.log('[hasDcApiSupport] checking navigator.credentials.get and window.DigitalCredential...');
+    const navHasGet =
+      typeof (navigator as { credentials?: { get?: unknown } }).credentials?.get === 'function';
+    const globalDigitalCredential =
+      typeof (window as { DigitalCredential?: unknown }).DigitalCredential !== 'undefined';
+
+    console.log('[hasDcApiSupport] navHasGet:', navHasGet, ', globalDigitalCredential:', globalDigitalCredential);
+    return navHasGet || globalDigitalCredential;
   }
 
   function maybeLogUnsupported(): void {

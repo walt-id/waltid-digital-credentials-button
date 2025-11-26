@@ -210,10 +210,21 @@ async function postCredentialResponse(
     throw new Error(`Verification failed (${response.status}): ${text || 'Unknown error'}`);
   }
 
-  if (response.headers.get('content-type')?.includes('application/json')) {
-    return await response.json();
+  // Even when the response call succeeds, the verification payload must be fetched via /info.
+  const infoResponse = await fetch(`${verifierBase}/verification-session/${sessionId}/info`, {
+    method: 'GET',
+    headers: { accept: 'application/json' }
+  });
+
+  if (!infoResponse.ok) {
+    const text = await infoResponse.text();
+    throw new Error(`Failed to fetch verification info (${infoResponse.status}): ${text || 'Unknown error'}`);
   }
-  return {};
+
+  if (infoResponse.headers.get('content-type')?.includes('application/json')) {
+    return await infoResponse.json();
+  }
+  return await infoResponse.text();
 }
 
 function getSessionId(configId: string, sessionStore: Map<string, string>): string | undefined {

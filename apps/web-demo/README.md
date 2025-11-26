@@ -16,7 +16,7 @@ Simple Vite demo for `<digital-credentials-button>`. Builds to static assets and
 ## Docker images
 
 ### Production (static, no mock server)
-- Build (from repo root): `docker build -t waltid/digital-credentials -f apps/web-demo/Dockerfile .`
+- Build (from repo root): `docker build -t waltid/digital-credentials -f apps/web-demo/Dockerfile-no-mock .`
 - Run: `docker run --rm -p 8080:80 waltid/digital-credentials`
 - Access at `http://localhost:8080`. This serves the built static assets via nginx; you must provide real `/api/dc/request` and `/api/dc/response` endpoints (same origin or adjust component attributes).
 
