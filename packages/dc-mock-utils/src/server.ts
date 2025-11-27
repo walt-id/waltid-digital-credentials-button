@@ -74,6 +74,7 @@ export function dcMockPlugin(options: DcMockPluginOptions = {}): Plugin {
               return;
             }
 
+            console.log(`[dc-mock] Forwarding credential response for configId=${configId}, sessionId=${sessionId}`);
             const verification = await postCredentialResponse(sessionId, payload, verifierBase);
             return sendJson(res, verification);
           }
@@ -139,7 +140,7 @@ async function fetchDcRequestFromBackend(
   sessionStore: Map<string, string>,
   verifierBase: string
 ): Promise<unknown> {
-  console.log(`Fetching DC request for configurationId: ${configurationId}`);
+  console.log(`[fetchDcRequestFromBackend] Fetching DC request for configurationId: ${configurationId}`);
   const sessionId = await createSession(configurationId, verifierBase);
   sessionStore.set(configurationId, sessionId);
   return requestSessionPayload(sessionId, verifierBase);
@@ -180,7 +181,7 @@ function buildSessionCreatePayload(configurationId: string): unknown {
 }
 
 async function requestSessionPayload(sessionId: string, verifierBase: string): Promise<unknown> {
-  console.log(`Requesting session payload for sessionId: ${sessionId}`);
+  console.log(`[requestSessionPayload] Requesting session payload for sessionId: ${sessionId}`);
   const response = await fetch(`${verifierBase}/verification-session/${sessionId}/request`, {
     method: 'GET',
     headers: { 'content-type': 'application/json' }
@@ -199,6 +200,7 @@ async function postCredentialResponse(
   payload: unknown,
   verifierBase: string
 ): Promise<unknown> {
+  console.log(`[dc-mock] POST /response for sessionId=${sessionId}`);
   const response = await fetch(`${verifierBase}/verification-session/${sessionId}/response`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -211,20 +213,59 @@ async function postCredentialResponse(
   }
 
   // Even when the response call succeeds, the verification payload must be fetched via /info.
+  const info = await pollInfo(sessionId, verifierBase);
+  console.log(`[dc-mock] GET /info for sessionId=${sessionId} succeeded`);
+  return info;
+}
+
+async function getInfo(sessionId: string, verifierBase: string): Promise<unknown> {
   const infoResponse = await fetch(`${verifierBase}/verification-session/${sessionId}/info`, {
     method: 'GET',
     headers: { accept: 'application/json' }
   });
-
   if (!infoResponse.ok) {
     const text = await infoResponse.text();
-    throw new Error(`Failed to fetch verification info (${infoResponse.status}): ${text || 'Unknown error'}`);
+    throw new Error(
+      `Failed to fetch verification info (${infoResponse.status}): ${text || 'Unknown error'}`
+    );
   }
 
   if (infoResponse.headers.get('content-type')?.includes('application/json')) {
     return await infoResponse.json();
   }
   return await infoResponse.text();
+}
+
+async function pollInfo(sessionId: string, verifierBase: string): Promise<unknown> {
+  const maxAttempts = 5;
+  let last: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (attempt > 0) await sleep(1000);
+    last = await getInfo(sessionId, verifierBase);
+    if (!isProcessing(last)) {
+      return last;
+    }
+    console.log(`[dc-mock] info still processing (attempt ${attempt + 1}/${maxAttempts})`);
+  }
+
+  return last;
+}
+
+function isProcessing(info: unknown): boolean {
+  if (info && typeof info === 'object') {
+    const status = (info as { status?: unknown }).status;
+    if (typeof status === 'string') {
+      const normalized = status.toLowerCase();
+      return normalized === 'received' || normalized === 'processing';
+    }
+  }
+  return false;
+}
+
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function getSessionId(configId: string, sessionStore: Map<string, string>): string | undefined {

@@ -166,7 +166,7 @@ function init(): void {
         logLineWithConsole(`[fetch] ${method} ${target.pathname}${target.search}`);
         if (init.body) {
           const bodyText = await bodyToString(init.body);
-          if (bodyText) logLineWithConsole(`[fetch] request body: ${bodyText}`);
+          if (bodyText) logLineWithConsole(`[fetch] request body: ${bodyText} at ${input}`);
         }
       }
 
