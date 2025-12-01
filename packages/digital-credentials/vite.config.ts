@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dcMockPlugin } from '@waltid/dc-mock-utils';
+import { dcDemoBackend } from '@waltid/dc-backend-demo';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const workspaceRoot = resolve(__dirname, '..', '..');
@@ -25,5 +25,5 @@ export default defineConfig({
       allow: [__dirname, workspaceRoot]
     }
   },
-  plugins: [dcMockPlugin()]
+  plugins: [dcDemoBackend()]
 });

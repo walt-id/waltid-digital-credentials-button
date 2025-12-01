@@ -19,7 +19,6 @@ npm install @waltid/digital-credentials
   request-id="unsigned-mdl"
   request-endpoint="/api/dc/request"
   response-endpoint="/api/dc/response"
-  mock="true"
   label="Request credentials"
 ></digital-credentials-button>
 ```
@@ -29,11 +28,10 @@ npm install @waltid/digital-credentials
 - `request-id` (string, default: `unsigned-mdl`): Which request to load (also forwarded as `request-id` query param).
 - `request-endpoint` (string, default: `/api/dc/request`): Base URL for fetching the DC API request payload. Component calls `${request-endpoint}/${request-id}`.
 - `response-endpoint` (string, default: `/api/dc/response`): URL to POST the DC API response for verification.
-- `mock` (`"true"`/`"false"`, default: `"false"`): Toggles mock mode; forwarded as `dc-mock`/`x-dc-mock`.
 - `label` (string, default: `Request credentials`): Button text.
 - `disabled` (boolean attribute): Manually disable interaction.
 
-All attributes are reflected as properties (`requestId`, `requestEndpoint`, `responseEndpoint`, `mock`, `label`, `disabled`).
+All attributes are reflected as properties (`requestId`, `requestEndpoint`, `responseEndpoint`, `label`, `disabled`).
 
 ## Events
 
@@ -81,9 +79,9 @@ digital-credentials-button::part(button) {
 
 ## How it works
 
-1. GET `${request-endpoint}/${request-id}` (adds `request-id` and `dc-mock` query params) to load the DC API payload.
+1. GET `${request-endpoint}/${request-id}` (adds `request-id` query param) to load the DC API payload.
 2. Calls `navigator.credentials.get` with the request payload.
-3. POSTs the DC API response to `response-endpoint` (with `request-id` and optional `dc-mock`).
+3. POSTs the DC API response to `response-endpoint` (with `request-id`).
 4. Emits lifecycle events for success/error at each stage.
 
 ## Core reuse

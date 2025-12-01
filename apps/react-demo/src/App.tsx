@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  REQUEST_ENDPOINT,
-  RESPONSE_ENDPOINT,
-  MOCK_FLAG_KEY
-} from '@waltid/dc-mock-utils/install-mocks';
+
+const REQUEST_ENDPOINT = '/api/dc/request';
+const RESPONSE_ENDPOINT = '/api/dc/response';
 
 type MinimalCredential = {
   givenName?: string;
@@ -17,7 +15,6 @@ export default function App() {
   const urlState = useMemo(() => new URL(window.location.href), []);
   const initialRequestId = urlState.searchParams.get('request-id') || 'unsigned-mdl';
   const [requestId, setRequestId] = useState(initialRequestId);
-  const [mockEnabled, setMockEnabled] = useState(resolveInitialMock());
   const [showCredential, setShowCredential] = useState(resolveShowCredential());
   const [logEntries, setLogEntries] = useState<string[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -27,22 +24,32 @@ export default function App() {
   useEffect(() => {
     const btn = btnRef.current;
     if (!btn) return;
-    primeButton(btn, requestId, mockEnabled);
+    primeButton(btn, requestId);
 
-    const handleStarted = (event: Event) => {
+    const handleStarted = () => {
       hideModal();
-      logLine(`[started] credential-request-started (${(event as CustomEvent).detail?.requestId ?? requestId})`);
+      logLine(`[${requestId}] credential request started`);
+      if (!hasDcApiSupport()) {
+        logLine('Digital Credentials API is not available in this browser. Try a compatible browser.');
+      }
     };
     const handleRequestLoaded = (event: Event) =>
       logJson('Digital Credentials API request', (event as CustomEvent).detail?.payload);
-    const handleDcSuccess = (event: Event) =>
-      logDcResponse((event as CustomEvent).detail?.response);
+    const handleDcSuccess = () =>
+      logLine('Digital Credentials API returned a credential response');
     const handleDcError = (event: Event) =>
-      logJson('[error:dc-api]', (event as CustomEvent).detail?.error);
-    const handleVerSuccess = (event: Event) => handleVerificationSuccess((event as CustomEvent).detail?.response);
+      logJson('Digital Credentials API error', (event as CustomEvent).detail?.error);
+    const handleVerSuccess = (event: Event) => {
+      const payload = (event as CustomEvent).detail?.response;
+      logJson('Credential verification response', payload);
+      if (showCredential) {
+        setCredential(extractFirstCredential(payload));
+        setModalVisible(true);
+      }
+    };
     const handleVerError = (event: Event) =>
-      logJson('[error:verification]', (event as CustomEvent).detail?.error);
-    const handleError = (event: Event) => logJson('[error]', (event as CustomEvent).detail);
+      logJson('Verification error', (event as CustomEvent).detail?.error);
+    const handleError = (event: Event) => logJson('Flow error', (event as CustomEvent).detail);
 
     btn.addEventListener('credential-request-started', handleStarted);
     btn.addEventListener('credential-request-loaded', handleRequestLoaded);
@@ -61,32 +68,13 @@ export default function App() {
       btn.removeEventListener('credential-verification-error', handleVerError);
       btn.removeEventListener('credential-error', handleError);
     };
-  }, [requestId, mockEnabled]);
+  }, [requestId, showCredential]);
 
-  const logLine = (message: string) => {
-    setLogEntries((prev) => [...prev, message]);
-  };
+  const logLine = (message: string) => setLogEntries((prev) => [...prev, message]);
 
   const logJson = (label: string, payload: unknown) => {
     const pretty = JSON.stringify(payload, null, 2);
     setLogEntries((prev) => [...prev, `${label}:\n${pretty}`]);
-  };
-
-  const logDcResponse = (response: unknown) => {
-    if (showCredential) {
-      logJson('Digital Credentials API response', response);
-    } else {
-      logJson('Digital Credentials API response', { hidden: true });
-    }
-  };
-
-  const handleVerificationSuccess = (response: unknown) => {
-    logJson('Credential Verification response', response);
-    if (showCredential) {
-      const cred = extractFirstCredential(response);
-      setCredential(cred);
-      setModalVisible(true);
-    }
   };
 
   const handleRequestChange = (value: string) => {
@@ -95,18 +83,9 @@ export default function App() {
     nextUrl.searchParams.set('request-id', value);
     window.history.replaceState({}, '', nextUrl.toString());
     const btn = btnRef.current;
-    if (btn) primeButton(btn, value, mockEnabled);
-    logLine(`[info] switched request-id to ${value}`);
+    if (btn) primeButton(btn, value);
+    logLine(`request-id set to ${value}`);
   };
-
-const toggleMock = () => {
-  const next = !mockEnabled;
-  localStorage.setItem(MOCK_FLAG_KEY, String(next));
-  setMockEnabled(next);
-  const url = new URL(window.location.href);
-  url.searchParams.set('dc-mock', next ? '1' : '0');
-  window.location.assign(url.toString());
-};
 
   const toggleShowCredential = () => {
     const next = !showCredential;
@@ -124,8 +103,8 @@ const toggleMock = () => {
         <h1 style={{ margin: 0 }}>Digital Credentials Button</h1>
       </div>
       <p className="lead">
-        React example of the web component that fetches a Digital Credentials API request from a backend,
-        calls <code>navigator.credentials.get</code>, and posts the result back.
+        React example of the web component backed by the demo backend. It fetches a Digital Credentials API
+        request, calls <code>navigator.credentials.get</code>, and sends the result back for verification.
       </p>
 
       <section className="card" style={{ marginBottom: 16 }}>
@@ -146,24 +125,18 @@ const toggleMock = () => {
           >
             <option value="unsigned-mdl">unsigned-mdl</option>
             <option value="signed-mdl">signed-mdl</option>
+            <option value="encrypted-mdl">encrypted-mdl</option>
+            <option value="unsigned-encrypted-mdl">unsigned-encrypted-mdl</option>
+            <option value="signed-encrypted-mdl">signed-encrypted-mdl</option>
             <option value="unsigned-photoid">unsigned-photoid</option>
             <option value="signed-photoid">signed-photoid</option>
           </select>
-          <div style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <strong>Show Credential</strong>
-              <label className="toggle" aria-label="Toggle credential visibility">
-                <input type="checkbox" checked={showCredential} onChange={toggleShowCredential} />
-                <span className="toggle-slider"></span>
-              </label>
-            </div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <strong>Mock mode</strong>
-              <label className="toggle" aria-label="Toggle mock mode">
-                <input type="checkbox" checked={mockEnabled} onChange={toggleMock} />
-                <span className="toggle-slider"></span>
-              </label>
-            </div>
+          <div style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <strong>Show Credential</strong>
+            <label className="toggle" aria-label="Toggle credential visibility">
+              <input type="checkbox" checked={showCredential} onChange={toggleShowCredential} />
+              <span className="toggle-slider"></span>
+            </label>
           </div>
         </div>
       </section>
@@ -227,20 +200,6 @@ function Field({ label, value }: { label: string; value?: string }) {
   );
 }
 
-function resolveInitialMock(): boolean {
-  const url = new URL(window.location.href);
-  const param = url.searchParams.get('dc-mock');
-  if (param !== null) {
-    const enabled = param === '1' || param.toLowerCase() === 'true';
-    localStorage.setItem(MOCK_FLAG_KEY, String(enabled));
-    return enabled;
-  }
-  const stored = localStorage.getItem(MOCK_FLAG_KEY);
-  const enabled = stored === 'true';
-  localStorage.setItem(MOCK_FLAG_KEY, String(enabled));
-  return enabled;
-}
-
 function resolveShowCredential(): boolean {
   const stored = localStorage.getItem('dc-show-credential');
   if (stored === null) {
@@ -250,15 +209,10 @@ function resolveShowCredential(): boolean {
   return stored === 'true';
 }
 
-function primeButton(btn: HTMLElement, requestId: string, mock: boolean): void {
+function primeButton(btn: HTMLElement, requestId: string): void {
   btn.setAttribute('request-id', requestId);
   btn.setAttribute('request-endpoint', REQUEST_ENDPOINT);
   btn.setAttribute('response-endpoint', RESPONSE_ENDPOINT);
-  if (mock) {
-    btn.setAttribute('mock', 'true');
-  } else {
-    btn.removeAttribute('mock');
-  }
 }
 
 function extractFirstCredential(input: unknown): MinimalCredential {
@@ -295,4 +249,12 @@ function extractFromPresentedCredentials(input: unknown): MinimalCredential | nu
     familyName: (claims['family_name'] ?? claims['familyName']) as string | undefined,
     ageOver21: typeof ageRaw === 'boolean' ? ageRaw : undefined
   };
+}
+
+function hasDcApiSupport(): boolean {
+  const navHasGet =
+    typeof (navigator as { credentials?: { get?: unknown } }).credentials?.get === 'function';
+  const globalDigitalCredential =
+    typeof (window as { DigitalCredential?: unknown }).DigitalCredential !== 'undefined';
+  return navHasGet || globalDigitalCredential;
 }

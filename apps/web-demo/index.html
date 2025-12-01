@@ -13,8 +13,12 @@
         <h1 style="margin:0;">Digital Credentials Button</h1>
       </div>
       <p class="lead">
-        A minimal web component that fetches a Digital Credentials API request from a backend,
+        A minimal web component + demo backend that fetches a Digital Credentials API request,
         calls <code>navigator.credentials.get</code>, and posts the result back.
+      </p>
+      <p style="margin-top: -6px; color: #475569;">
+        Endpoints are served from <code>/api/dc/request</code> and <code>/api/dc/response</code> by the in-repo demo backend.
+        Use a browser with Digital Credentials API support.
       </p>
 
       <section class="card" style="margin-bottom: 16px;">
@@ -33,20 +37,11 @@
             <option value="signed-photoid">signed-photoid</option>
           </select>
           <div style="margin-left: auto; display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <div style="display: inline-flex; align-items: center; gap: 6px;">
-              <strong>Show Credential</strong>
-              <label class="toggle" aria-label="Toggle credential visibility">
-                <input type="checkbox" id="show-credential-toggle" />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-            <div style="display: inline-flex; align-items: center; gap: 8px;">
-              <strong>Mock mode</strong>
-              <label class="toggle" aria-label="Toggle mock mode">
-                <input type="checkbox" id="mock-toggle" />
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
+            <strong>Show Credential</strong>
+            <label class="toggle" aria-label="Toggle credential visibility">
+              <input type="checkbox" id="show-credential-toggle" />
+              <span class="toggle-slider"></span>
+            </label>
           </div>
         </div>
       </section>

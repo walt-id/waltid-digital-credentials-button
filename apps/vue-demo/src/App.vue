@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { REQUEST_ENDPOINT, RESPONSE_ENDPOINT, MOCK_FLAG_KEY } from '@waltid/dc-mock-utils/install-mocks';
+
+const REQUEST_ENDPOINT = '/api/dc/request';
+const RESPONSE_ENDPOINT = '/api/dc/response';
 
 type MinimalCredential = {
   givenName?: string;
@@ -12,7 +14,6 @@ type MinimalCredential = {
 
 const urlState = new URL(window.location.href);
 const requestId = ref(urlState.searchParams.get('request-id') || 'unsigned-mdl');
-const mockEnabled = ref(resolveInitialMock());
 const showCredential = ref(resolveShowCredential());
 const logEntries = ref<string[]>([]);
 const logContent = computed(() =>
@@ -32,37 +33,12 @@ const logJson = (label: string, payload: unknown) => {
   logEntries.value = [...logEntries.value, `${label}:\n${pretty}`];
 };
 
-const logDcResponse = (response: unknown) => {
-  if (showCredential.value) {
-    logJson('Digital Credentials API response', response);
-  } else {
-    logJson('Digital Credentials API response', { hidden: true });
-  }
-};
-
-const handleVerificationSuccess = (response: unknown) => {
-  logJson('Credential Verification response', response);
-  if (showCredential.value) {
-    credential.value = extractFirstCredential(response);
-    modalVisible.value = true;
-  }
-};
-
 const clearLog = () => {
   logEntries.value = [];
 };
 
 const hideModal = () => {
   modalVisible.value = false;
-};
-
-const toggleMock = () => {
-  const next = !mockEnabled.value;
-  localStorage.setItem(MOCK_FLAG_KEY, String(next));
-  mockEnabled.value = next;
-  const url = new URL(window.location.href);
-  url.searchParams.set('dc-mock', next ? '1' : '0');
-  window.location.assign(url.toString());
 };
 
 const toggleShowCredential = () => {
@@ -77,7 +53,7 @@ const handleRequestChange = (value: string) => {
   nextUrl.searchParams.set('request-id', value);
   window.history.replaceState({}, '', nextUrl.toString());
   primeButton();
-  logLine(`[info] switched request-id to ${value}`);
+  logLine(`request-id set to ${value}`);
 };
 
 onMounted(() => {
@@ -85,23 +61,30 @@ onMounted(() => {
   if (!el) return;
   primeButton();
 
-  const handleStarted = (event: Event) => {
+  const handleStarted = () => {
     hideModal();
-    logLine(
-      `[started] credential-request-started (${(event as CustomEvent).detail?.requestId ?? requestId.value})`
-    );
+    logLine(`[${requestId.value}] credential request started`);
+    if (!hasDcApiSupport()) {
+      logLine('Digital Credentials API is not available in this browser. Try a compatible browser.');
+    }
   };
   const handleRequestLoaded = (event: Event) =>
     logJson('Digital Credentials API request', (event as CustomEvent).detail?.payload);
-  const handleDcSuccess = (event: Event) =>
-    logDcResponse((event as CustomEvent).detail?.response);
+  const handleDcSuccess = () =>
+    logLine('Digital Credentials API returned a credential response');
   const handleDcError = (event: Event) =>
-    logJson('[error:dc-api]', (event as CustomEvent).detail?.error);
-  const handleVerSuccess = (event: Event) =>
-    handleVerificationSuccess((event as CustomEvent).detail?.response);
+    logJson('Digital Credentials API error', (event as CustomEvent).detail?.error);
+  const handleVerSuccess = (event: Event) => {
+    const payload = (event as CustomEvent).detail?.response;
+    logJson('Credential verification response', payload);
+    if (showCredential.value) {
+      credential.value = extractFirstCredential(payload);
+      modalVisible.value = true;
+    }
+  };
   const handleVerError = (event: Event) =>
-    logJson('[error:verification]', (event as CustomEvent).detail?.error);
-  const handleError = (event: Event) => logJson('[error]', (event as CustomEvent).detail);
+    logJson('Verification error', (event as CustomEvent).detail?.error);
+  const handleError = (event: Event) => logJson('Flow error', (event as CustomEvent).detail);
 
   el.addEventListener('credential-request-started', handleStarted);
   el.addEventListener('credential-request-loaded', handleRequestLoaded);
@@ -134,25 +117,6 @@ function primeButton(): void {
   el.setAttribute('request-id', requestId.value);
   el.setAttribute('request-endpoint', REQUEST_ENDPOINT);
   el.setAttribute('response-endpoint', RESPONSE_ENDPOINT);
-  if (mockEnabled.value) {
-    el.setAttribute('mock', 'true');
-  } else {
-    el.removeAttribute('mock');
-  }
-}
-
-function resolveInitialMock(): boolean {
-  const url = new URL(window.location.href);
-  const param = url.searchParams.get('dc-mock');
-  if (param !== null) {
-    const enabled = param === '1' || param.toLowerCase() === 'true';
-    localStorage.setItem(MOCK_FLAG_KEY, String(enabled));
-    return enabled;
-  }
-  const stored = localStorage.getItem(MOCK_FLAG_KEY);
-  const enabled = stored === 'true';
-  localStorage.setItem(MOCK_FLAG_KEY, String(enabled));
-  return enabled;
 }
 
 function resolveShowCredential(): boolean {
@@ -198,6 +162,14 @@ function extractFromPresentedCredentials(input: unknown): MinimalCredential | nu
     ageOver21: typeof ageRaw === 'boolean' ? ageRaw : undefined
   };
 }
+
+function hasDcApiSupport(): boolean {
+  const navHasGet =
+    typeof (navigator as { credentials?: { get?: unknown } }).credentials?.get === 'function';
+  const globalDigitalCredential =
+    typeof (window as { DigitalCredential?: unknown }).DigitalCredential !== 'undefined';
+  return navHasGet || globalDigitalCredential;
+}
 </script>
 
 <template>
@@ -207,7 +179,7 @@ function extractFromPresentedCredentials(input: unknown): MinimalCredential | nu
       <h1 style="margin:0;">Digital Credentials Button</h1>
     </div>
     <p class="lead">
-      Vue example of the web component that fetches a Digital Credentials API request from a backend,
+      Vue example of the web component backed by the demo backend. It fetches a Digital Credentials API request,
       calls <code>navigator.credentials.get</code>, and posts the result back.
     </p>
 
@@ -222,6 +194,9 @@ function extractFromPresentedCredentials(input: unknown): MinimalCredential | nu
         >
           <option value="unsigned-mdl">unsigned-mdl</option>
           <option value="signed-mdl">signed-mdl</option>
+          <option value="encrypted-mdl">encrypted-mdl</option>
+          <option value="unsigned-encrypted-mdl">unsigned-encrypted-mdl</option>
+          <option value="signed-encrypted-mdl">signed-encrypted-mdl</option>
           <option value="unsigned-photoid">unsigned-photoid</option>
           <option value="signed-photoid">signed-photoid</option>
         </select>
@@ -230,13 +205,6 @@ function extractFromPresentedCredentials(input: unknown): MinimalCredential | nu
             <strong>Show Credential</strong>
             <label class="toggle" aria-label="Toggle credential visibility">
               <input type="checkbox" :checked="showCredential" @change="toggleShowCredential" />
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div style="display: inline-flex; align-items: center; gap: 8px;">
-            <strong>Mock mode</strong>
-            <label class="toggle" aria-label="Toggle mock mode">
-              <input type="checkbox" :checked="mockEnabled" @change="toggleMock" />
               <span class="toggle-slider"></span>
             </label>
           </div>

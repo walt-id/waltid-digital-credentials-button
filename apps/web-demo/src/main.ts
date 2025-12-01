@@ -1,6 +1,15 @@
 import '@waltid/digital-credentials';
-import { installMocks, REQUEST_ENDPOINT, RESPONSE_ENDPOINT, MOCK_FLAG_KEY } from '@waltid/dc-mock-utils/install-mocks';
 import './style.css';
+
+const REQUEST_ENDPOINT = '/api/dc/request';
+const RESPONSE_ENDPOINT = '/api/dc/response';
+
+type MinimalCredential = {
+  givenName?: string;
+  familyName?: string;
+  ageOver21?: boolean;
+  issuer?: string;
+};
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
@@ -9,14 +18,9 @@ if (document.readyState === 'loading') {
 }
 
 function init(): void {
-  const urlState = new URL(window.location.href);
-  let REQUEST_ID = urlState.searchParams.get('request-id') || 'unsigned-mdl';
-  resolveInitialMock();
-
   const logEntries: string[] = [];
   const logEl = document.getElementById('log') as HTMLPreElement | null;
   const dcButton = document.getElementById('demo-btn') as HTMLElement | null;
-  const mockToggle = document.getElementById('mock-toggle') as HTMLInputElement | null;
   const requestSelect = document.getElementById('request-select') as HTMLSelectElement | null;
   const clearLogBtn = document.getElementById('clear-log') as HTMLButtonElement | null;
   const showCredentialToggle = document.getElementById('show-credential-toggle') as HTMLInputElement | null;
@@ -27,72 +31,49 @@ function init(): void {
   const dlAge = document.getElementById('dl-age-over-21');
   const dlIssuer = document.getElementById('dl-issuer');
 
-  installMocks();
-  enableFetchLogging();
+  const urlState = new URL(window.location.href);
+  let requestId = urlState.searchParams.get('request-id') || 'unsigned-mdl';
+
   primeButton();
   renderLog();
   wireEvents();
 
-  function primeButton(): void {
-    if (!dcButton) return;
-    dcButton.setAttribute('request-id', REQUEST_ID);
-    dcButton.setAttribute('request-endpoint', REQUEST_ENDPOINT);
-    dcButton.setAttribute('response-endpoint', RESPONSE_ENDPOINT);
-    const mockOn = getMockEnabled();
-    if (mockOn) {
-      dcButton.setAttribute('mock', 'true');
-    } else {
-      dcButton.removeAttribute('mock');
-    }
-  }
-
   function wireEvents(): void {
     if (dcButton) {
-      dcButton.addEventListener('credential-request-started', (event) => {
+      dcButton.addEventListener('credential-request-started', () => {
         hideCredentialModal();
-        const requestId = (event as CustomEvent).detail?.requestId ?? REQUEST_ID;
-        logLineWithConsole(`[started] credential-request-started (${requestId})`);
-        console.log('checking DC API support.digital-credentials ...');
-        maybeLogUnsupported();
+        logLine(`[${requestId}] credential request started`);
+        maybeWarnUnsupported();
       });
       dcButton.addEventListener('credential-request-loaded', (event) =>
-        logJsonWithConsole('Digital Credentials API request loaded', (event as CustomEvent).detail?.payload)
+        logJson('Digital Credentials API request', (event as CustomEvent).detail?.payload)
       );
-      dcButton.addEventListener('credential-dcapi-success', (event) => {
-        logDcResponse((event as CustomEvent).detail?.response);
-        logLineWithConsole('DC API succeeded; sending response for verification...');
-      });
+      dcButton.addEventListener('credential-dcapi-success', () =>
+        logLine('Digital Credentials API returned a credential response')
+      );
       dcButton.addEventListener('credential-dcapi-error', (event) =>
-        logJsonWithConsole('[error:dc-api]', (event as CustomEvent).detail?.error)
+        logJson('Digital Credentials API error', (event as CustomEvent).detail?.error)
       );
       dcButton.addEventListener('credential-verification-success', (event) =>
         handleVerificationSuccess((event as CustomEvent).detail?.response)
       );
       dcButton.addEventListener('credential-verification-error', (event) =>
-        logJsonWithConsole('[error:verification]', (event as CustomEvent).detail?.error)
+        logJson('Verification error', (event as CustomEvent).detail?.error)
       );
       dcButton.addEventListener('credential-error', (event) =>
-        logJsonWithConsole('[error]', (event as CustomEvent).detail)
+        logJson('Flow error', (event as CustomEvent).detail)
       );
-    }
-
-    if (mockToggle) {
-      mockToggle.checked = getMockEnabled();
-      mockToggle.addEventListener('change', () => {
-        setMockEnabled(mockToggle.checked);
-        primeButton();
-      });
     }
 
     if (requestSelect) {
-      requestSelect.value = REQUEST_ID;
+      requestSelect.value = requestId;
       requestSelect.addEventListener('change', () => {
-        REQUEST_ID = requestSelect.value;
+        requestId = requestSelect.value;
         const nextUrl = new URL(window.location.href);
-        nextUrl.searchParams.set('request-id', REQUEST_ID);
+        nextUrl.searchParams.set('request-id', requestId);
         window.history.replaceState({}, '', nextUrl.toString());
         primeButton();
-        logLine(`[info] switched request-id to ${REQUEST_ID}`);
+        logLine(`request-id set to ${requestId}`);
       });
     }
 
@@ -107,22 +88,17 @@ function init(): void {
       showCredentialToggle.checked = getShowCredentialEnabled();
       showCredentialToggle.addEventListener('change', () => {
         setShowCredentialEnabled(showCredentialToggle.checked);
-        logLine(`[info] credential visibility ${showCredentialToggle.checked ? 'enabled' : 'disabled'}`);
       });
     }
 
     if (modalClose && modalBackdrop) {
-      const closeModal = () => hideCredentialModal();
-      modalClose.addEventListener('click', closeModal);
+      const close = () => hideCredentialModal();
+      modalClose.addEventListener('click', close);
       modalBackdrop.addEventListener('click', (event) => {
-        if (event.target === modalBackdrop) {
-          closeModal();
-        }
+        if (event.target === modalBackdrop) close();
       });
       document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-          closeModal();
-        }
+        if (event.key === 'Escape') close();
       });
     }
   }
@@ -137,103 +113,17 @@ function init(): void {
     renderLog();
   }
 
-  function logLineWithConsole(message: string): void {
-    console.log('[dc-demo]', message);
-    logLine(message);
-  }
-
   function logJson(label: string, payload: unknown): void {
     const pretty = JSON.stringify(payload, null, 2);
     logEntries.push(`${label}:\n${pretty}`);
     renderLog();
   }
 
-  function logJsonWithConsole(label: string, payload: unknown): void {
-    console.log('[dc-demo]', label, payload);
-    logJson(label, payload);
-  }
-
-  function enableFetchLogging(): void {
-    const originalFetch = window.fetch.bind(window);
-
-    window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
-      const method = (init.method || 'GET').toUpperCase();
-      const target = resolveUrl(input);
-      const shouldLog =
-        target.pathname.startsWith('/api/dc/') || target.pathname.includes('/verification-session/');
-
-      if (shouldLog) {
-        logLineWithConsole(`[fetch] ${method} ${target.pathname}${target.search}`);
-        if (init.body) {
-          const bodyText = await bodyToString(init.body);
-          if (bodyText) logLineWithConsole(`[fetch] request body: ${bodyText} at ${input}`);
-        }
-      }
-
-      try {
-        const response = await originalFetch(input as any, init);
-        if (shouldLog) {
-          let responseText = '';
-          try {
-            responseText = await response.clone().text();
-          } catch {
-            // ignore
-          }
-          logLineWithConsole(
-            `[fetch] response ${response.status} ${response.statusText || ''} for ${target.pathname}${target.search}`
-          );
-          if (responseText) {
-            //logJsonWithConsole('[fetch] response body', safeParse(responseText));
-          }
-        }
-        return response;
-      } catch (error) {
-        if (shouldLog) {
-          logJsonWithConsole('[fetch] error', error);
-        }
-        throw error;
-      }
-    };
-
-    function resolveUrl(input: RequestInfo | URL): URL {
-      if (typeof input === 'string') return new URL(input, window.location.href);
-      if (input && typeof input === 'object' && 'url' in input) {
-        return new URL((input as Request).url, window.location.href);
-      }
-      return new URL(window.location.href);
-    }
-
-    async function bodyToString(body: BodyInit | null | undefined): Promise<string> {
-      if (!body) return '';
-      if (typeof body === 'string') return body;
-      if (body instanceof Blob) return await body.text();
-      if (body instanceof FormData) {
-        const payload: Record<string, unknown> = {};
-        for (const [key, value] of body.entries()) {
-          payload[key] = value;
-        }
-        return JSON.stringify(payload);
-      }
-      return '';
-    }
-
-    function safeParse(text: string): unknown {
-      try {
-        return JSON.parse(text);
-      } catch {
-        return text;
-      }
-    }
-  }
-
-  function getMockEnabled(): boolean {
-    return localStorage.getItem(MOCK_FLAG_KEY) === 'true';
-  }
-
-  function setMockEnabled(next: boolean): void {
-    localStorage.setItem(MOCK_FLAG_KEY, String(next));
-    syncMockParam(next);
-    window.location.reload();
+  function primeButton(): void {
+    if (!dcButton) return;
+    dcButton.setAttribute('request-id', requestId);
+    dcButton.setAttribute('request-endpoint', REQUEST_ENDPOINT);
+    dcButton.setAttribute('response-endpoint', RESPONSE_ENDPOINT);
   }
 
   function getShowCredentialEnabled(): boolean {
@@ -249,58 +139,26 @@ function init(): void {
     localStorage.setItem('dc-show-credential', String(next));
   }
 
-  function resolveInitialMock(): boolean {
-    const url = new URL(window.location.href);
-    const param = url.searchParams.get('dc-mock');
-    if (param !== null) {
-      const enabled = param === '1' || param.toLowerCase() === 'true';
-      localStorage.setItem(MOCK_FLAG_KEY, String(enabled));
-      return enabled;
-    }
-    const stored = localStorage.getItem(MOCK_FLAG_KEY);
-    const enabled = stored === 'true';
-    localStorage.setItem(MOCK_FLAG_KEY, String(enabled));
-    return enabled;
-  }
-
-  function syncMockParam(enabled: boolean): void {
-    const url = new URL(window.location.href);
-    url.searchParams.set('dc-mock', enabled ? '1' : '0');
-    window.history.replaceState({}, '', url.toString());
-  }
-
-  function logDcResponse(response: unknown): void {
-    if (getShowCredentialEnabled()) {
-      logJsonWithConsole('Digital Credentials API response', response);
-    } else {
-      logJsonWithConsole('Digital Credentials API response', { hidden: true });
-    }
-  }
-
-  function handleVerificationSuccess(response: unknown): void {
-    logJsonWithConsole('Credential Verification response', response);
-    if (getShowCredentialEnabled()) {
-      showCredentialModal(response);
+  function maybeWarnUnsupported(): void {
+    if (!hasDcApiSupport()) {
+      logLine(
+        'Digital Credentials API is not available in this browser. Please switch to a compatible browser.'
+      );
     }
   }
 
   function hasDcApiSupport(): boolean {
-    console.log('[hasDcApiSupport] checking navigator.credentials.get and window.DigitalCredential...');
     const navHasGet =
       typeof (navigator as { credentials?: { get?: unknown } }).credentials?.get === 'function';
     const globalDigitalCredential =
       typeof (window as { DigitalCredential?: unknown }).DigitalCredential !== 'undefined';
-
-    console.log('[hasDcApiSupport] navHasGet:', navHasGet, ', globalDigitalCredential:', globalDigitalCredential);
     return navHasGet || globalDigitalCredential;
   }
 
-  function maybeLogUnsupported(): void {
-    if (getMockEnabled()) return;
-    if (!hasDcApiSupport()) {
-      logLine(
-        '[error:dc-api] Digital Credentials API is not available in this browser. Please switch to a compatible browser or enable mock mode.'
-      );
+  function handleVerificationSuccess(response: unknown): void {
+    logJson('Credential verification response', response);
+    if (getShowCredentialEnabled()) {
+      showCredentialModal(response);
     }
   }
 
@@ -324,13 +182,6 @@ function init(): void {
     modalBackdrop.hidden = true;
     modalBackdrop.style.display = 'none';
   }
-
-  type MinimalCredential = {
-    givenName?: string;
-    familyName?: string;
-    ageOver21?: boolean;
-    issuer?: string;
-  };
 
   function extractFirstCredential(input: unknown): MinimalCredential {
     if (!input || typeof input !== 'object') return {};
