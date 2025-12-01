@@ -4,11 +4,20 @@
     "dcql_query": {
       "credentials": [
         {
-          "id": "my_mdl",
+          "id": "my_photoid",
           "format": "mso_mdoc",
           "meta": {
-            "doctype_value": "org.iso.23220.photoid.1"
+            "doctype_value": "org.iso.23220.photoID.1"
+          },
+          "claims": [
+          {
+            "path": [
+              "org.iso.23220.1",
+              "age_over_18"
+            ],
+            "intent_to_retain": false
           }
+        ]
         }
       ]
     },
