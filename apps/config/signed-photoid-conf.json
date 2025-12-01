@@ -1,50 +1,40 @@
 {
-  "dcql_query": {
-    "credentials": [
-      {
-        "id": "my_mdl",
-        "format": "mso_mdoc",
-        "meta": {
-          "doctype_value": "org.iso.18013.5.1.mDL"
-        },
-        "claims": [
-          {
-            "path": [
-              "org.iso.18013.5.1",
-              "family_name"
-            ]
-          },
-          {
-            "path": [
-              "org.iso.18013.5.1",
-              "given_name"
-            ]
-          },
-          {
-            "path": [
-              "org.iso.18013.5.1",
-              "age_over_21"
-            ]
+  "flow_type": "dc_api",
+  "core": {
+    "dcql_query": {
+      "credentials": [
+        {
+          "id": "my_mdl",
+          "format": "mso_mdoc",
+          "meta": {
+            "doctype_value": "org.iso.23220.photoid.1"
           }
-        ]
+        }
+      ]
+    },
+    "signed_request": true,
+    "encrypted_response": false,
+    "policies": {
+      "vcPolicies": [
+        {
+          "policy": "signature"
+        }
+      ]
+    },
+    "clientId": "x509_hash:abc-xyz-base64url-sha256-hash-of-der-x509-leaf",
+    "key": {
+      "type": "jwk",
+      "jwk": {
+        "kty": "EC",
+        "d": "AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA",
+        "crv": "P-256",
+        "kid": "_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug",
+        "x": "G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0",
+        "y": "VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"
       }
-    ]
+    }
   },
-  "policies": {
-    "vcPolicies": [
-      {
-        "policy": "signature"
-      }
-    ]
-  },
-  "signedRequest": true,
-  "encryptedResponse": false,
-  "dcApi": true,
-  "haip": false,
-  "urlPrefix": null,
-  "urlHost": "https://digital-credentials.walt.id",
   "expectedOrigins": [
     "https://digital-credentials.walt.id"
-  ],
-  "clientId": "x509_hash:abc-xyz-base64url-sha256-hash-of-der-x509-leaf"
+  ]
 }
