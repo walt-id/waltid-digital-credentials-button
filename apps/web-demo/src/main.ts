@@ -3,6 +3,7 @@ import './style.css';
 
 const REQUEST_LIST_ENDPOINT = '/api/dc/requests';
 const REQUEST_ENDPOINT = '/api/dc/request';
+const REQUEST_CONFIG_ENDPOINT = '/api/dc/request-config';
 const RESPONSE_ENDPOINT = '/api/dc/response';
 const DEFAULT_REQUEST_ID = 'unsigned-mdl';
 
@@ -54,7 +55,7 @@ async function init(): Promise<void> {
     if (dcButton) {
       dcButton.addEventListener('credential-request-started', () => {
         hideCredentialModal();
-        logLine(`[${requestId}] credential request started`);
+        logLine(`credential request started`);
         maybeWarnUnsupported();
       });
       dcButton.addEventListener('credential-request-loaded', (event) =>
@@ -158,6 +159,7 @@ async function init(): Promise<void> {
   }
 
   function logLine(message: string): void {
+    console.log(message);
     logEntries.push(message);
     renderLog();
   }
@@ -249,7 +251,7 @@ async function init(): Promise<void> {
 
   async function openCustomizeModal(): Promise<void> {
     if (!customizeModal || !customizeTextarea || !customizeSubtitle) return;
-    const basePayload = customPayload ?? (await fetchRequestPayload(requestId));
+    const basePayload = customPayload ?? (await fetchRequestConfig(requestId));
     customizeSubtitle.textContent = `Request: ${requestId}`;
     customizeTextarea.value = basePayload ? JSON.stringify(basePayload, null, 2) : '';
     customizeModal.hidden = false;
@@ -260,17 +262,17 @@ async function init(): Promise<void> {
     customizeModal.hidden = true;
   }
 
-  async function fetchRequestPayload(id: string): Promise<unknown> {
-    const url = `${REQUEST_ENDPOINT}/${encodeURIComponent(id)}`;
+  async function fetchRequestConfig(id: string): Promise<unknown> {
+    const url = `${REQUEST_CONFIG_ENDPOINT}/${encodeURIComponent(id)}`;
     const response = await fetch(url, { headers: { accept: 'application/json' }, cache: 'no-store' });
     if (!response.ok) {
-      console.error(`Failed to fetch request payload for ${id}: ${response.status}`);
+      console.error(`Failed to fetch request config for ${id}: ${response.status}`);
       return null;
     }
     try {
       return await response.json();
     } catch (error) {
-      console.error('Failed to parse request payload JSON', error);
+      console.error('Failed to parse request config JSON', error);
       return null;
     }
   }

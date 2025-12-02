@@ -37,6 +37,8 @@ export async function requestCredential(options: RequestCredentialOptions): Prom
   const responseEndpoint = options.responseEndpoint ?? '/api/dc/response';
   const fetchFn = options.fetchImpl ?? fetch;
 
+  console.info('[dc-client] starting flow', { requestId, requestEndpoint, responseEndpoint });
+
   const requestPayload = await resolveRequestPayload({
     fetchFn,
     requestEndpoint,
@@ -44,7 +46,9 @@ export async function requestCredential(options: RequestCredentialOptions): Prom
     headers: options.headers,
     providedPayload: options.requestPayload
   });
+  console.info('[dc-client] request payload resolved', requestPayload);
   const dcResponse = await invokeDigitalCredentialsApi(requestPayload);
+  console.info('[dc-client] dc-api response', dcResponse);
   const verification = await postVerification(
     fetchFn,
     responseEndpoint,
@@ -52,6 +56,7 @@ export async function requestCredential(options: RequestCredentialOptions): Prom
     dcResponse,
     options.headers
   );
+  console.info('[dc-client] verification response', verification);
 
   return { request: requestPayload, dcResponse, verification };
 }
@@ -72,8 +77,8 @@ async function resolveRequestPayload(options: {
     if (typeof providedPayload !== 'object') {
       throw new CredentialFlowError('request', 'Request payload must be an object.');
     }
-    await primeSession(fetchFn, requestEndpoint, requestId, headers);
-    return providedPayload;
+    console.info('[dc-client] sending provided request payload to backend', providedPayload);
+    return await fetchRequestPayloadWithConfig(fetchFn, requestEndpoint, requestId, headers, providedPayload);
   }
 
   if (!requestEndpoint) {
@@ -90,18 +95,6 @@ async function resolveRequestPayload(options: {
   return payload;
 }
 
-async function primeSession(
-  fetchFn: typeof fetch,
-  endpoint: string,
-  requestId: string,
-  headers: Record<string, string>
-): Promise<void> {
-  if (!endpoint) {
-    throw new CredentialFlowError('request', 'request-endpoint is required to start a session.');
-  }
-  await fetchRequestPayload(fetchFn, endpoint, requestId, headers);
-}
-
 async function fetchRequestPayload(
   fetchFn: typeof fetch,
   endpoint: string,
@@ -111,6 +104,8 @@ async function fetchRequestPayload(
   const url = new URL(endpoint, window.location.origin);
   url.pathname = `${url.pathname.replace(/\/$/, '')}/${encodeURIComponent(requestId)}`;
   url.searchParams.set('request-id', requestId);
+
+  console.info('[dc-client] fetching request payload', { url: url.toString(), requestId });
 
   let response: Response;
   try {
@@ -130,6 +125,8 @@ async function fetchRequestPayload(
     throw new CredentialFlowError('request', 'Failed to read DC request response', error);
   }
 
+  console.debug('[dc-client] request payload response', { status: response.status, body: text });
+
   if (!response.ok) {
     throw new CredentialFlowError('request', `Failed to fetch DC request (${response.status})`, text);
   }
@@ -141,6 +138,60 @@ async function fetchRequestPayload(
   }
 }
 
+async function fetchRequestPayloadWithConfig(
+  fetchFn: typeof fetch,
+  endpoint: string,
+  requestId: string,
+  headers: Record<string, string>,
+  configPayload: unknown
+): Promise<unknown> {
+  const url = new URL(endpoint, window.location.origin);
+  url.pathname = `${url.pathname.replace(/\/$/, '')}/${encodeURIComponent(requestId)}`;
+  url.searchParams.set('request-id', requestId);
+
+  let response: Response;
+  try {
+    response = await fetchFn(url.toString(), {
+      method: 'POST',
+      headers: { accept: 'application/json', 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(configPayload),
+      cache: 'no-store'
+    });
+  } catch (error) {
+    throw new CredentialFlowError('network', 'Failed to send custom request config', error);
+  }
+
+  let text: string;
+  try {
+    text = await response.text();
+  } catch (error) {
+    throw new CredentialFlowError('request', 'Failed to read DC request response', error);
+  }
+
+  console.debug('[dc-client] request payload (custom config) response', {
+    status: response.status,
+    body: text
+  });
+
+  if (!response.ok) {
+    throw new CredentialFlowError(
+      'request',
+      text || `Failed to fetch DC request from custom config (${response.status})`
+    );
+  }
+
+  try {
+    const parsed = text ? JSON.parse(text) : null;
+    if (parsed === null || typeof parsed !== 'object') {
+      throw new CredentialFlowError('request', 'DC request payload must be an object.');
+    }
+    return parsed;
+  } catch (error) {
+    if (error instanceof CredentialFlowError) throw error;
+    throw new CredentialFlowError('request', 'Failed to parse DC request JSON', error);
+  }
+}
+
 async function invokeDigitalCredentialsApi(requestPayload: unknown): Promise<unknown> {
   const nav = navigator as unknown as { credentials?: { get?: (opts: unknown) => Promise<unknown> } };
   if (!nav.credentials?.get) {
@@ -148,12 +199,15 @@ async function invokeDigitalCredentialsApi(requestPayload: unknown): Promise<unk
   }
 
   try {
+    console.info('[dc-client] invoking navigator.credentials.get');
     const result = await nav.credentials.get(requestPayload as any);
     if (result == null) {
       throw new CredentialFlowError('dc-api', 'Digital Credentials API returned empty response.');
     }
+    console.info('[dc-client] dc-api success', result);
     return result;
   } catch (error) {
+    console.error('[dc-client] dc-api error', error);
     if (error instanceof CredentialFlowError) {
       throw error;
     }
@@ -170,6 +224,8 @@ async function postVerification(
 ): Promise<unknown> {
   const url = new URL(endpoint, window.location.origin);
   url.searchParams.set('request-id', requestId);
+
+  console.info('[dc-client] posting verification', { url: url.toString(), requestId });
 
   let response: Response;
   try {
@@ -192,6 +248,8 @@ async function postVerification(
   } catch (error) {
     throw new CredentialFlowError('verification', 'Failed to read verification response', error);
   }
+
+  console.debug('[dc-client] verification response', { status: response.status, body: text });
 
   if (!response.ok) {
     throw new CredentialFlowError('verification', text || `Verification failed (${response.status})`);

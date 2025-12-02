@@ -67,6 +67,21 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
             return sendJson(res, payload);
           }
 
+          if (req.method === 'POST' && pathname.startsWith(REQUEST_PATH)) {
+            const requestId = getRequestId(url, pathname);
+            const overrideConfig = await readJsonBody(req);
+            if (!overrideConfig || typeof overrideConfig !== 'object') {
+              throw new HttpError(400, 'Request payload is required to create a session.');
+            }
+            const sessionId = await createSession(requestId, verifierBase, overrideConfig);
+            sessions.set(requestId, sessionId);
+            logger.info?.(
+              `[dc-demo-backend] session ${sessionId} created for ${requestId} (custom config)`
+            );
+            const payload = await fetchRequestPayload(sessionId, verifierBase);
+            return sendJson(res, payload);
+          }
+
           if (req.method === 'POST' && pathname.startsWith(RESPONSE_PATH)) {
             const requestId = getRequestId(url, pathname);
             const sessionId = sessions.get(requestId) ?? [...sessions.values()].at(-1);
@@ -108,8 +123,12 @@ function getRequestId(url: URL, pathname = url.pathname, basePath = REQUEST_PATH
   return parts[0] ?? 'unsigned-mdl';
 }
 
-async function createSession(requestId: string, verifierBase: string): Promise<string> {
-  const config = await readConfig(requestId);
+async function createSession(
+  requestId: string,
+  verifierBase: string,
+  overrideConfig?: unknown
+): Promise<string> {
+  const config = overrideConfig ?? (await readConfig(requestId));
   const response = await fetch(`${verifierBase}/verification-session/create`, {
     method: 'POST',
     headers: {
