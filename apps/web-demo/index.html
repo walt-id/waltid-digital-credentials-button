@@ -18,7 +18,6 @@
       </p>
       <p style="margin-top: -6px; color: #475569;">
         Endpoints are served from <code>/api/dc/request</code> and <code>/api/dc/response</code> by the in-repo demo backend.
-        Use a browser with Digital Credentials API support.
       </p>
 
       <section class="card" style="margin-bottom: 16px;">
@@ -26,7 +25,7 @@
           <label for="request-select"><strong>Request</strong></label>
           <select
             id="request-select"
-            style="min-width: 200px; padding: 6px 10px; border-radius: 8px; border: 1px solid #e2e8f0;"
+            style="min-width: 200px; padding: 10px 12px; border-radius: 8px; border: 1px solid #e2e8f0;"
           >
             <option value="unsigned-mdl">unsigned-mdl</option>
             <option value="signed-mdl">signed-mdl</option>
@@ -36,6 +35,13 @@
             <option value="unsigned-photoid">unsigned-photoid</option>
             <option value="signed-photoid">signed-photoid</option>
           </select>
+          <button
+            id="customize-request"
+            type="button"
+            class="dc-btn dc-btn-secondary"
+          >
+            Customize Request
+          </button>
           <div style="margin-left: auto; display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap;">
             <strong>Show Credential</strong>
             <label class="toggle" aria-label="Toggle credential visibility">
@@ -96,5 +102,24 @@
         </div>
       </div>
     </main>
+
+    <div id="customize-modal-backdrop" class="modal-backdrop" hidden>
+      <div class="modal-dialog">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+          <div>
+            <div style="font-weight:700;">Customize Request</div>
+            <div id="customize-modal-subtitle" style="color:#475569; font-size: 0.9rem;"></div>
+          </div>
+          <button id="customize-modal-close" type="button" class="dc-btn dc-btn-secondary" style="min-width: auto; padding: 6px 10px;">Close</button>
+        </div>
+        <div style="margin-bottom:12px; color:#475569; font-size: 0.95rem;">
+          Edit the DC API request payload. Saved versions are stored locally and used instead of the backend payload for this request.
+        </div>
+        <textarea id="customize-textarea" class="code-input" aria-label="Customize DC API request"></textarea>
+        <div class="modal-actions">
+          <button id="customize-save" type="button" class="dc-btn">Save</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

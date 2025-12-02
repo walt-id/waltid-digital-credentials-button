@@ -72,6 +72,7 @@ async function resolveRequestPayload(options: {
     if (typeof providedPayload !== 'object') {
       throw new CredentialFlowError('request', 'Request payload must be an object.');
     }
+    await primeSession(fetchFn, requestEndpoint, requestId, headers);
     return providedPayload;
   }
 
@@ -87,6 +88,18 @@ async function resolveRequestPayload(options: {
     throw new CredentialFlowError('request', 'DC request payload must be an object.');
   }
   return payload;
+}
+
+async function primeSession(
+  fetchFn: typeof fetch,
+  endpoint: string,
+  requestId: string,
+  headers: Record<string, string>
+): Promise<void> {
+  if (!endpoint) {
+    throw new CredentialFlowError('request', 'request-endpoint is required to start a session.');
+  }
+  await fetchRequestPayload(fetchFn, endpoint, requestId, headers);
 }
 
 async function fetchRequestPayload(

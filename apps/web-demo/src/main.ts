@@ -25,6 +25,12 @@ async function init(): Promise<void> {
   const dcButton = document.getElementById('demo-btn') as HTMLElement | null;
   const requestSelect = document.getElementById('request-select') as HTMLSelectElement | null;
   const clearLogBtn = document.getElementById('clear-log') as HTMLButtonElement | null;
+  const customizeBtn = document.getElementById('customize-request') as HTMLButtonElement | null;
+  const customizeModal = document.getElementById('customize-modal-backdrop') as HTMLElement | null;
+  const customizeClose = document.getElementById('customize-modal-close') as HTMLButtonElement | null;
+  const customizeSave = document.getElementById('customize-save') as HTMLButtonElement | null;
+  const customizeTextarea = document.getElementById('customize-textarea') as HTMLTextAreaElement | null;
+  const customizeSubtitle = document.getElementById('customize-modal-subtitle') as HTMLDivElement | null;
   const showCredentialToggle = document.getElementById('show-credential-toggle') as HTMLInputElement | null;
   const modalBackdrop = document.getElementById('credential-modal-backdrop') as HTMLElement | null;
   const modalClose = document.getElementById('modal-close') as HTMLButtonElement | null;
@@ -35,12 +41,14 @@ async function init(): Promise<void> {
 
   const urlState = new URL(window.location.href);
   let requestId = urlState.searchParams.get('request-id') || DEFAULT_REQUEST_ID;
+  let customPayload: unknown = readCustomPayload(requestId);
   const fallbackRequestIds = getRequestIdsFromSelect();
 
   await loadRequestOptions(fallbackRequestIds);
   primeButton();
   renderLog();
   wireEvents();
+  applyCustomPayload();
 
   function wireEvents(): void {
     if (dcButton) {
@@ -74,6 +82,8 @@ async function init(): Promise<void> {
       requestSelect.addEventListener('change', () => {
         requestId = requestSelect.value;
         syncRequestIdToUrl(requestId);
+        customPayload = readCustomPayload(requestId);
+        applyCustomPayload();
         primeButton();
         logLine(`request-id set to ${requestId}`);
       });
@@ -84,6 +94,43 @@ async function init(): Promise<void> {
         logEntries.length = 0;
         renderLog();
       });
+    }
+
+    if (customizeBtn) {
+      customizeBtn.addEventListener('click', () => void openCustomizeModal());
+    }
+
+    if (customizeSave && customizeTextarea) {
+      customizeSave.addEventListener('click', () => {
+        const nextValue = customizeTextarea.value.trim();
+        let parsed: unknown;
+        try {
+          parsed = nextValue ? JSON.parse(nextValue) : null;
+        } catch (error) {
+          alert('Invalid JSON. Please fix and try again.');
+          console.error('Invalid custom request JSON', error);
+          return;
+        }
+
+        if (parsed === null) {
+          clearCustomPayload(requestId);
+          customPayload = undefined;
+          applyCustomPayload();
+          closeCustomizeModal();
+          logLine(`Custom payload cleared for ${requestId}`);
+          return;
+        }
+
+        writeCustomPayload(requestId, parsed);
+        customPayload = parsed;
+        applyCustomPayload();
+        closeCustomizeModal();
+        logLine(`Custom payload saved for ${requestId}`);
+      });
+    }
+
+    if (customizeClose) {
+      customizeClose.addEventListener('click', () => closeCustomizeModal());
     }
 
     if (showCredentialToggle) {
@@ -121,6 +168,17 @@ async function init(): Promise<void> {
     renderLog();
   }
 
+  function applyCustomPayload(): void {
+    if (!dcButton) return;
+    if (customPayload !== undefined) {
+      dcButton.setAttribute('request-payload', JSON.stringify(customPayload));
+      dcButton.setAttribute('data-has-custom-payload', 'true');
+    } else {
+      dcButton.removeAttribute('request-payload');
+      dcButton.removeAttribute('data-has-custom-payload');
+    }
+  }
+
   async function loadRequestOptions(fallbackIds: string[]): Promise<void> {
     if (!requestSelect) return;
 
@@ -140,6 +198,8 @@ async function init(): Promise<void> {
     }
 
     requestSelect.value = requestId;
+    customPayload = readCustomPayload(requestId);
+    applyCustomPayload();
   }
 
   async function fetchRequestIds(): Promise<string[]> {
@@ -185,6 +245,65 @@ async function init(): Promise<void> {
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set('request-id', next);
     window.history.replaceState({}, '', nextUrl.toString());
+  }
+
+  async function openCustomizeModal(): Promise<void> {
+    if (!customizeModal || !customizeTextarea || !customizeSubtitle) return;
+    const basePayload = customPayload ?? (await fetchRequestPayload(requestId));
+    customizeSubtitle.textContent = `Request: ${requestId}`;
+    customizeTextarea.value = basePayload ? JSON.stringify(basePayload, null, 2) : '';
+    customizeModal.hidden = false;
+  }
+
+  function closeCustomizeModal(): void {
+    if (!customizeModal) return;
+    customizeModal.hidden = true;
+  }
+
+  async function fetchRequestPayload(id: string): Promise<unknown> {
+    const url = `${REQUEST_ENDPOINT}/${encodeURIComponent(id)}`;
+    const response = await fetch(url, { headers: { accept: 'application/json' }, cache: 'no-store' });
+    if (!response.ok) {
+      console.error(`Failed to fetch request payload for ${id}: ${response.status}`);
+      return null;
+    }
+    try {
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to parse request payload JSON', error);
+      return null;
+    }
+  }
+
+  function writeCustomPayload(id: string, payload: unknown): void {
+    try {
+      localStorage.setItem(customPayloadKey(id), JSON.stringify(payload));
+    } catch (error) {
+      console.error('Failed to save custom payload', error);
+    }
+  }
+
+  function readCustomPayload(id: string): unknown {
+    try {
+      const raw = localStorage.getItem(customPayloadKey(id));
+      if (!raw) return undefined;
+      return JSON.parse(raw);
+    } catch (error) {
+      console.error('Failed to read custom payload', error);
+      return undefined;
+    }
+  }
+
+  function clearCustomPayload(id: string): void {
+    try {
+      localStorage.removeItem(customPayloadKey(id));
+    } catch (error) {
+      console.error('Failed to clear custom payload', error);
+    }
+  }
+
+  function customPayloadKey(id: string): string {
+    return `dc-custom-payload:${id}`;
   }
 
   function primeButton(): void {

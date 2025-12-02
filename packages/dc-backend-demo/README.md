@@ -3,6 +3,7 @@
 Tiny Vite middleware that stands in for a backend during development. It exposes three endpoints, creates verification sessions against a verifier, and keeps a short-lived in-memory map of `request-id` to `sessionId`.
 
 - `GET /api/dc/requests` — lists available request IDs by reading `config/*-conf.json`.
+- `GET /api/dc/request-config/:requestId` — returns the raw config JSON for a request.
 - `GET /api/dc/request/:requestId` — reads `config/<requestId>-conf.json`, POSTs it to `${VERIFIER_BASE}/verification-session/create`, stores the returned `sessionId`, then fetches the DC API request from `/verification-session/{sessionId}/request`.
 - `POST /api/dc/response` — looks up the last `sessionId` for the given `request-id`, forwards the payload to `/verification-session/{sessionId}/response`, then polls `/verification-session/{sessionId}/info` and returns that result.
 

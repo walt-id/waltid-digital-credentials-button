@@ -10,6 +10,7 @@ const configDir = resolve(packageRoot, 'config');
 
 const REQUEST_LIST_PATH = '/api/dc/requests';
 const REQUEST_PATH = '/api/dc/request';
+const REQUEST_CONFIG_PATH = '/api/dc/request-config';
 const RESPONSE_PATH = '/api/dc/response';
 const DEFAULT_VERIFIER_BASE = 'https://verifier2.portal.test.waltid.cloud';
 
@@ -47,6 +48,12 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
           if (req.method === 'GET' && pathname === REQUEST_LIST_PATH) {
             const requestIds = await listRequestIds();
             return sendJson(res, requestIds);
+          }
+
+          if (req.method === 'GET' && pathname.startsWith(REQUEST_CONFIG_PATH)) {
+            const requestId = getRequestId(url, pathname, REQUEST_CONFIG_PATH);
+            const config = await readConfig(requestId);
+            return sendJson(res, config);
           }
 
           if (req.method === 'GET' && pathname.startsWith(REQUEST_PATH)) {
@@ -91,12 +98,12 @@ class HttpError extends Error {
   }
 }
 
-function getRequestId(url: URL, pathname = url.pathname): string {
+function getRequestId(url: URL, pathname = url.pathname, basePath = REQUEST_PATH): string {
   const normalized = normalizePath(pathname);
   const fromQuery = url.searchParams.get('request-id') || url.searchParams.get('requestId');
   if (fromQuery) return fromQuery;
 
-  const suffix = normalized.replace(REQUEST_PATH, '');
+  const suffix = normalized.replace(basePath, '');
   const parts = suffix.split('/').filter(Boolean);
   return parts[0] ?? 'unsigned-mdl';
 }

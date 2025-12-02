@@ -156,6 +156,15 @@ export class DigitalCredentialButton extends HTMLElement {
   }
   set requestPayload(value: unknown) {
     this.#requestPayload = value;
+    if (value === undefined) {
+      this.removeAttribute('request-payload');
+    } else {
+      try {
+        this.setAttribute('request-payload', JSON.stringify(value));
+      } catch {
+        // ignore serialization errors; keep internal value
+      }
+    }
   }
 
   get label(): string {
