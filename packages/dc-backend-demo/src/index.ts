@@ -5,9 +5,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Plugin } from 'vite';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const workspaceRoot = resolve(__dirname, '..', '..', '..');
-const configDir = resolve(workspaceRoot, 'apps', 'config');
+const packageRoot = resolve(__dirname, '..');
+const configDir = resolve(packageRoot, 'config');
 
+const REQUEST_LIST_PATH = '/api/dc/requests';
 const REQUEST_PATH = '/api/dc/request';
 const RESPONSE_PATH = '/api/dc/response';
 const DEFAULT_VERIFIER_BASE = 'https://verifier2.portal.test.waltid.cloud';
@@ -19,9 +20,14 @@ export type DcDemoBackendOptions = {
   logger?: Logger;
 };
 
+const normalizePath = (pathname: string): string => {
+  const trimmed = pathname.replace(/\/+$/, '');
+  return trimmed || '/';
+};
+
 /**
  * Vite dev-server plugin that exposes a tiny demo backend:
- * - GET /api/dc/request/:requestId -> creates a verification session using apps/config/*-conf.json and returns the DC API payload
+ * - GET /api/dc/request/:requestId -> creates a verification session using config/*-conf.json and returns the DC API payload
  * - POST /api/dc/response -> forwards the credential to the verifier and returns verification info
  */
 export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
@@ -35,10 +41,17 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
       server.middlewares.use(async (req, res, next) => {
         if (!req.url) return next();
         const url = new URL(req.url, 'http://localhost');
+        const pathname = normalizePath(url.pathname);
 
         try {
-          if (req.method === 'GET' && url.pathname.startsWith(REQUEST_PATH)) {
-            const requestId = getRequestId(url);
+          if (req.method === 'GET' && pathname === REQUEST_LIST_PATH) {
+            const requestIds = await listRequestIds();
+            return sendJson(res, requestIds);
+          }
+
+          if (req.method === 'GET' && pathname.startsWith(REQUEST_PATH)) {
+            if (pathname === REQUEST_LIST_PATH) return next();
+            const requestId = getRequestId(url, pathname);
             const sessionId = await createSession(requestId, verifierBase);
             sessions.set(requestId, sessionId);
             logger.info?.(`[dc-demo-backend] session ${sessionId} created for ${requestId}`);
@@ -47,8 +60,8 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
             return sendJson(res, payload);
           }
 
-          if (req.method === 'POST' && url.pathname.startsWith(RESPONSE_PATH)) {
-            const requestId = getRequestId(url);
+          if (req.method === 'POST' && pathname.startsWith(RESPONSE_PATH)) {
+            const requestId = getRequestId(url, pathname);
             const sessionId = sessions.get(requestId) ?? [...sessions.values()].at(-1);
             if (!sessionId) {
               throw new HttpError(400, 'No active session. Fetch the request first.');
@@ -78,11 +91,12 @@ class HttpError extends Error {
   }
 }
 
-function getRequestId(url: URL): string {
+function getRequestId(url: URL, pathname = url.pathname): string {
+  const normalized = normalizePath(pathname);
   const fromQuery = url.searchParams.get('request-id') || url.searchParams.get('requestId');
   if (fromQuery) return fromQuery;
 
-  const suffix = url.pathname.replace(REQUEST_PATH, '');
+  const suffix = normalized.replace(REQUEST_PATH, '');
   const parts = suffix.split('/').filter(Boolean);
   return parts[0] ?? 'unsigned-mdl';
 }
@@ -181,7 +195,7 @@ async function readConfig(requestId: string): Promise<unknown> {
 
   if (!fs.existsSync(path)) {
     const available = await listRequestIds();
-    const hint = available.length ? `Available: ${available.join(', ')}` : 'No configs found in apps/config.';
+    const hint = available.length ? `Available: ${available.join(', ')}` : 'No configs found in config/.';
     throw new HttpError(404, `No configuration found for "${requestId}". ${hint}`);
   }
 

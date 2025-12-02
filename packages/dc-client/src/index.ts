@@ -1,8 +1,8 @@
 export type RequestCredentialOptions = {
-  requestId: string;
+  requestId?: string;
+  requestPayload?: unknown;
   requestEndpoint?: string;
   responseEndpoint?: string;
-  mock?: boolean;
   headers?: Record<string, string>;
   fetchImpl?: typeof fetch;
 };
@@ -26,52 +26,84 @@ export class CredentialFlowError extends Error {
   }
 }
 
+const DEFAULT_REQUEST_ID = 'unsigned-mdl';
+
 /**
  * End-to-end Digital Credentials flow: fetch request, call DC API, post verification.
  */
 export async function requestCredential(options: RequestCredentialOptions): Promise<CredentialFlowResult> {
-  const requestEndpoint = (options.requestEndpoint ?? '/api/dc/request').replace(/\/$/, '');
+  const requestId = resolveRequestId(options.requestId);
+  const requestEndpoint = options.requestEndpoint ? options.requestEndpoint.replace(/\/$/, '') : '/api/dc/request';
   const responseEndpoint = options.responseEndpoint ?? '/api/dc/response';
-  const mock = Boolean(options.mock);
   const fetchFn = options.fetchImpl ?? fetch;
 
-  const requestPayload = await fetchRequestPayload(
+  const requestPayload = await resolveRequestPayload({
     fetchFn,
     requestEndpoint,
-    options.requestId,
-    options.headers,
-    mock
-  );
+    requestId,
+    headers: options.headers,
+    providedPayload: options.requestPayload
+  });
   const dcResponse = await invokeDigitalCredentialsApi(requestPayload);
   const verification = await postVerification(
     fetchFn,
     responseEndpoint,
-    options.requestId,
+    requestId,
     dcResponse,
-    options.headers,
-    mock
+    options.headers
   );
 
   return { request: requestPayload, dcResponse, verification };
+}
+
+async function resolveRequestPayload(options: {
+  fetchFn: typeof fetch;
+  requestEndpoint: string;
+  requestId: string;
+  headers?: Record<string, string>;
+  providedPayload?: unknown;
+}): Promise<unknown> {
+  const { fetchFn, requestEndpoint, requestId, headers = {}, providedPayload } = options;
+
+  if (providedPayload !== undefined) {
+    if (providedPayload === null) {
+      throw new CredentialFlowError('request', 'Request payload is required but was null.');
+    }
+    if (typeof providedPayload !== 'object') {
+      throw new CredentialFlowError('request', 'Request payload must be an object.');
+    }
+    return providedPayload;
+  }
+
+  if (!requestEndpoint) {
+    throw new CredentialFlowError('request', 'request-endpoint is required when no request-payload is provided.');
+  }
+
+  const payload = await fetchRequestPayload(fetchFn, requestEndpoint, requestId, headers);
+  if (payload === null || payload === undefined) {
+    throw new CredentialFlowError('request', 'Received empty DC request payload.');
+  }
+  if (typeof payload !== 'object') {
+    throw new CredentialFlowError('request', 'DC request payload must be an object.');
+  }
+  return payload;
 }
 
 async function fetchRequestPayload(
   fetchFn: typeof fetch,
   endpoint: string,
   requestId: string,
-  headers: Record<string, string> = {},
-  mock: boolean
+  headers: Record<string, string> = {}
 ): Promise<unknown> {
   const url = new URL(endpoint, window.location.origin);
   url.pathname = `${url.pathname.replace(/\/$/, '')}/${encodeURIComponent(requestId)}`;
   url.searchParams.set('request-id', requestId);
-  if (mock) url.searchParams.set('dc-mock', '1');
 
   let response: Response;
   try {
     response = await fetchFn(url.toString(), {
       method: 'GET',
-      headers: { accept: 'application/json', ...headers, 'x-dc-mock': mock ? '1' : '0' },
+      headers: { accept: 'application/json', ...headers },
       cache: 'no-store'
     });
   } catch (error) {
@@ -121,12 +153,10 @@ async function postVerification(
   endpoint: string,
   requestId: string,
   dcResponse: unknown,
-  headers: Record<string, string> = {},
-  mock: boolean
+  headers: Record<string, string> = {}
 ): Promise<unknown> {
   const url = new URL(endpoint, window.location.origin);
   url.searchParams.set('request-id', requestId);
-  if (mock) url.searchParams.set('dc-mock', '1');
 
   let response: Response;
   try {
@@ -135,8 +165,7 @@ async function postVerification(
       headers: {
         accept: 'application/json',
         'content-type': 'application/json',
-        ...headers,
-        'x-dc-mock': mock ? '1' : '0'
+        ...headers
       },
       body: JSON.stringify({ credential: dcResponse, requestId })
     });
@@ -161,4 +190,17 @@ async function postVerification(
   } catch {
     return { raw: text };
   }
+}
+
+function resolveRequestId(explicit?: string): string {
+  if (explicit && explicit.trim()) return explicit;
+  if (typeof window !== 'undefined' && window.location?.href) {
+    try {
+      const fromUrl = new URL(window.location.href).searchParams.get('request-id');
+      if (fromUrl && fromUrl.trim()) return fromUrl;
+    } catch {
+      // ignore URL parsing errors
+    }
+  }
+  return DEFAULT_REQUEST_ID;
 }

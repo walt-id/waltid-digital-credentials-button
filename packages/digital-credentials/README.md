@@ -25,13 +25,23 @@ npm install @waltid/digital-credentials
 
 ## Attributes / properties
 
-- `request-id` (string, default: `unsigned-mdl`): Which request to load (also forwarded as `request-id` query param).
-- `request-endpoint` (string, default: `/api/dc/request`): Base URL for fetching the DC API request payload. Component calls `${request-endpoint}/${request-id}`.
+- `request-id` (string, default: from `?request-id` in the URL or `unsigned-mdl`): Which request to load (also forwarded as `request-id` query param).
+- `request-payload` (object/JSON string, optional): If provided, the component skips fetching from `request-endpoint` and uses this payload directly.
+- `request-endpoint` (string, default: `/api/dc/request`): Base URL for fetching the DC API request payload. Component calls `${request-endpoint}/${request-id}` when no `request-payload` is set.
 - `response-endpoint` (string, default: `/api/dc/response`): URL to POST the DC API response for verification.
 - `label` (string, default: `Request credentials`): Button text.
 - `disabled` (boolean attribute): Manually disable interaction.
 
-All attributes are reflected as properties (`requestId`, `requestEndpoint`, `responseEndpoint`, `label`, `disabled`).
+All attributes are reflected as properties (`requestId`, `requestPayload`, `requestEndpoint`, `responseEndpoint`, `label`, `disabled`).
+
+To bypass fetching from your backend, set a payload directly:
+
+```html
+<digital-credentials-button
+  request-payload='{"publicKey":"..."}'
+  response-endpoint="/api/dc/response"
+></digital-credentials-button>
+```
 
 ## Events
 
@@ -79,7 +89,7 @@ digital-credentials-button::part(button) {
 
 ## How it works
 
-1. GET `${request-endpoint}/${request-id}` (adds `request-id` query param) to load the DC API payload.
+1. Resolve a request payload: use `request-payload` if provided, otherwise GET `${request-endpoint}/${request-id}` (adds `request-id` query param).
 2. Calls `navigator.credentials.get` with the request payload.
 3. POSTs the DC API response to `response-endpoint` (with `request-id`).
 4. Emits lifecycle events for success/error at each stage.

@@ -1,13 +1,14 @@
 # @waltid/dc-backend-demo
 
-Tiny Vite middleware that stands in for a backend during development. It exposes two endpoints, creates verification sessions against a verifier, and keeps a short-lived in-memory map of `request-id` to `sessionId`.
+Tiny Vite middleware that stands in for a backend during development. It exposes three endpoints, creates verification sessions against a verifier, and keeps a short-lived in-memory map of `request-id` to `sessionId`.
 
-- `GET /api/dc/request/:requestId` — reads `apps/config/<requestId>-conf.json`, POSTs it to `${VERIFIER_BASE}/verification-session/create`, stores the returned `sessionId`, then fetches the DC API request from `/verification-session/{sessionId}/request`.
+- `GET /api/dc/requests` — lists available request IDs by reading `config/*-conf.json`.
+- `GET /api/dc/request/:requestId` — reads `config/<requestId>-conf.json`, POSTs it to `${VERIFIER_BASE}/verification-session/create`, stores the returned `sessionId`, then fetches the DC API request from `/verification-session/{sessionId}/request`.
 - `POST /api/dc/response` — looks up the last `sessionId` for the given `request-id`, forwards the payload to `/verification-session/{sessionId}/response`, then polls `/verification-session/{sessionId}/info` and returns that result.
 
 Defaults:
 - `VERIFIER_BASE` env (or `verifierBase` option) sets the verifier base URL. Fallback: `https://verifier2.portal.test.waltid.cloud`.
-- Configs live in `apps/config/*-conf.json` (e.g., `unsigned-mdl-conf.json`). Add your own to support new `request-id`s.
+- Configs live in `config/*-conf.json` (e.g., `unsigned-mdl-conf.json`). Add your own to support new `request-id`s.
 
 ## Usage (Vite)
 ```ts

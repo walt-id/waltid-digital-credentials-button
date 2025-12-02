@@ -11,17 +11,17 @@ const result = await requestCredential({
   requestId: 'unsigned-mdl',
   requestEndpoint: '/api/dc/request',
   responseEndpoint: '/api/dc/response',
-  mock: true
+  // requestPayload: { ... } // optional: bypass fetching and use this payload directly
 });
 
 console.log(result.request, result.dcResponse, result.verification);
 ```
 
 Options:
-- `requestId` (string, required)
+- `requestId` (string, optional; defaults to `request-id` query param or `unsigned-mdl`)
+- `requestPayload` (object, optional; if provided, skips fetching from `request-endpoint`)
 - `requestEndpoint` (default `/api/dc/request`)
 - `responseEndpoint` (default `/api/dc/response`)
-- `mock` (boolean) – forwarded as `dc-mock`/`x-dc-mock`
 - `headers` (object) – merged into fetch headers
 - `fetchImpl` – custom fetch (for SSR/tests)
 

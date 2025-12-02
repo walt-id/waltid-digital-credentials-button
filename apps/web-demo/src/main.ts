@@ -1,8 +1,10 @@
 import '@waltid/digital-credentials';
 import './style.css';
 
+const REQUEST_LIST_ENDPOINT = '/api/dc/requests';
 const REQUEST_ENDPOINT = '/api/dc/request';
 const RESPONSE_ENDPOINT = '/api/dc/response';
+const DEFAULT_REQUEST_ID = 'unsigned-mdl';
 
 type MinimalCredential = {
   givenName?: string;
@@ -12,12 +14,12 @@ type MinimalCredential = {
 };
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', () => void init().catch(handleInitError));
 } else {
-  init();
+  void init().catch(handleInitError);
 }
 
-function init(): void {
+async function init(): Promise<void> {
   const logEntries: string[] = [];
   const logEl = document.getElementById('log') as HTMLPreElement | null;
   const dcButton = document.getElementById('demo-btn') as HTMLElement | null;
@@ -32,8 +34,10 @@ function init(): void {
   const dlIssuer = document.getElementById('dl-issuer');
 
   const urlState = new URL(window.location.href);
-  let requestId = urlState.searchParams.get('request-id') || 'unsigned-mdl';
+  let requestId = urlState.searchParams.get('request-id') || DEFAULT_REQUEST_ID;
+  const fallbackRequestIds = getRequestIdsFromSelect();
 
+  await loadRequestOptions(fallbackRequestIds);
   primeButton();
   renderLog();
   wireEvents();
@@ -69,9 +73,7 @@ function init(): void {
       requestSelect.value = requestId;
       requestSelect.addEventListener('change', () => {
         requestId = requestSelect.value;
-        const nextUrl = new URL(window.location.href);
-        nextUrl.searchParams.set('request-id', requestId);
-        window.history.replaceState({}, '', nextUrl.toString());
+        syncRequestIdToUrl(requestId);
         primeButton();
         logLine(`request-id set to ${requestId}`);
       });
@@ -117,6 +119,72 @@ function init(): void {
     const pretty = JSON.stringify(payload, null, 2);
     logEntries.push(`${label}:\n${pretty}`);
     renderLog();
+  }
+
+  async function loadRequestOptions(fallbackIds: string[]): Promise<void> {
+    if (!requestSelect) return;
+
+    const requestIds = await fetchRequestIds().catch((error) => {
+      console.error('Failed to load request list; using fallback options', error);
+      return [];
+    });
+
+    const idsToRender = requestIds.length ? requestIds : fallbackIds;
+    if (!idsToRender.length) return;
+
+    renderRequestOptions(idsToRender);
+
+    if (!idsToRender.includes(requestId)) {
+      requestId = idsToRender[0];
+      syncRequestIdToUrl(requestId);
+    }
+
+    requestSelect.value = requestId;
+  }
+
+  async function fetchRequestIds(): Promise<string[]> {
+    const response = await fetch(REQUEST_LIST_ENDPOINT, { headers: { accept: 'application/json' } });
+    if (!response.ok) {
+      throw new Error(`Failed to load request list (${response.status})`);
+    }
+
+    const data = await response.json();
+    const candidates = Array.isArray(data)
+      ? data
+      : Array.isArray((data as { requests?: unknown }).requests)
+        ? (data as { requests: unknown[] }).requests
+        : [];
+
+    const normalized = candidates
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    return Array.from(new Set(normalized));
+  }
+
+  function renderRequestOptions(ids: string[]): void {
+    if (!requestSelect) return;
+    requestSelect.innerHTML = '';
+    ids.forEach((id) => {
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent = id;
+      requestSelect.appendChild(option);
+    });
+  }
+
+  function getRequestIdsFromSelect(): string[] {
+    if (!requestSelect) return [];
+    return Array.from(requestSelect.options)
+      .map((option) => option.value)
+      .filter(Boolean);
+  }
+
+  function syncRequestIdToUrl(next: string): void {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('request-id', next);
+    window.history.replaceState({}, '', nextUrl.toString());
   }
 
   function primeButton(): void {
@@ -221,4 +289,8 @@ function init(): void {
       ageOver21: typeof ageRaw === 'boolean' ? ageRaw : undefined
     };
   }
+}
+
+function handleInitError(error: unknown): void {
+  console.error('Failed to initialize web demo', error);
 }

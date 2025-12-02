@@ -15,23 +15,28 @@ type ObservedAttr =
   | 'request-id'
   | 'request-endpoint'
   | 'response-endpoint'
-  | 'mock'
+  | 'request-payload'
   | 'label'
   | 'disabled';
 
 const DEFAULT_LABEL = 'Request Digital Credentials';
 const DEFAULT_REQUEST_ENDPOINT = '/api/dc/request';
 const DEFAULT_RESPONSE_ENDPOINT = '/api/dc/response';
+const DEFAULT_REQUEST_ID = 'unsigned-mdl';
 
 export class DigitalCredentialButton extends HTMLElement {
   static get observedAttributes(): ObservedAttr[] {
-    return ['request-id', 'request-endpoint', 'response-endpoint', 'mock', 'label', 'disabled'];
+    return ['request-id', 'request-endpoint', 'response-endpoint', 'request-payload', 'label', 'disabled'];
   }
 
   #shadow: ShadowRoot;
   #button: HTMLButtonElement;
   #status: HTMLDivElement;
   #loading = false;
+  #requestPayload: unknown | undefined;
+  #requestPayloadAttrCache: unknown | undefined;
+  #requestPayloadAttrValue: string | null = null;
+  #requestPayloadAttrError = false;
 
   constructor() {
     super();
@@ -99,7 +104,11 @@ export class DigitalCredentialButton extends HTMLElement {
   }
 
   get requestId(): string {
-    return this.getAttribute('request-id') || 'unsigned-mdl';
+    const attr = this.getAttribute('request-id');
+    if (attr) return attr;
+    const fromUrl = this.#requestIdFromUrl();
+    if (fromUrl) return fromUrl;
+    return DEFAULT_REQUEST_ID;
   }
   set requestId(value: string) {
     this.setAttribute('request-id', value);
@@ -119,15 +128,34 @@ export class DigitalCredentialButton extends HTMLElement {
     this.setAttribute('response-endpoint', value);
   }
 
-  get mock(): boolean {
-    return this.getAttribute('mock') === 'true';
-  }
-  set mock(value: boolean) {
-    if (value) {
-      this.setAttribute('mock', 'true');
-    } else {
-      this.removeAttribute('mock');
+  get requestPayload(): unknown {
+    if (this.#requestPayload !== undefined) return this.#requestPayload;
+    const raw = this.getAttribute('request-payload');
+    if (raw === this.#requestPayloadAttrValue) {
+      return this.#requestPayloadAttrError ? undefined : this.#requestPayloadAttrCache;
     }
+
+    this.#requestPayloadAttrValue = raw;
+    if (!raw) {
+      this.#requestPayloadAttrCache = undefined;
+      this.#requestPayloadAttrError = false;
+      return undefined;
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+      this.#requestPayloadAttrCache = parsed;
+      this.#requestPayloadAttrError = false;
+      return parsed;
+    } catch (error) {
+      console.error('Failed to parse request-payload attribute as JSON.', error);
+      this.#requestPayloadAttrCache = undefined;
+      this.#requestPayloadAttrError = true;
+      return undefined;
+    }
+  }
+  set requestPayload(value: unknown) {
+    this.#requestPayload = value;
   }
 
   get label(): string {
@@ -151,8 +179,10 @@ export class DigitalCredentialButton extends HTMLElement {
   #render(): void {
     this.#button.textContent = this.#loading ? 'Requesting…' : this.label;
     this.#button.disabled = this.#loading || this.disabled;
-    if (!this.requestEndpoint || !this.responseEndpoint || !this.requestId) {
-      this.#setStatus('Set request-id, request-endpoint, and response-endpoint to begin.');
+    const hasPayload = this.requestPayload !== undefined;
+    const missingRequestInfo = !hasPayload && (!this.requestEndpoint || !this.requestId);
+    if (!this.responseEndpoint || missingRequestInfo) {
+      this.#setStatus('Set request-id or request-payload plus endpoints to begin.');
     } else {
       this.#setStatus('');
     }
@@ -172,6 +202,7 @@ export class DigitalCredentialButton extends HTMLElement {
       this.#emitError('request', 'request-id is required');
       return;
     }
+    const requestPayload = this.requestPayload;
 
     this.dispatchEvent(
       new CustomEvent('credential-request-started', {
@@ -188,7 +219,7 @@ export class DigitalCredentialButton extends HTMLElement {
         requestId,
         requestEndpoint: this.requestEndpoint,
         responseEndpoint: this.responseEndpoint,
-        mock: this.mock
+        requestPayload
       });
 
       this.dispatchEvent(
@@ -277,6 +308,15 @@ export class DigitalCredentialButton extends HTMLElement {
   #setLoading(next: boolean): void {
     this.#loading = next;
     this.#render();
+  }
+
+  #requestIdFromUrl(): string | null {
+    if (typeof window === 'undefined' || !window.location?.href) return null;
+    try {
+      return new URL(window.location.href).searchParams.get('request-id');
+    } catch {
+      return null;
+    }
   }
 }
 

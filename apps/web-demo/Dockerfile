@@ -12,7 +12,6 @@ COPY packages/dc-client packages/dc-client
 COPY packages/dc-backend-demo packages/dc-backend-demo
 COPY packages/digital-credentials packages/digital-credentials
 COPY apps/web-demo apps/web-demo
-COPY apps/config apps/config
 
 RUN npm ci
 
