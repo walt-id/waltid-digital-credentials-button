@@ -10,14 +10,25 @@
             "doctype_value": "org.iso.23220.photoID.1"
           },
           "claims": [
-          {
-            "path": [
-              "org.iso.23220.1",
-              "age_over_18"
-            ],
-            "intent_to_retain": false
-          }
-        ]
+            {
+              "path": [
+                "org.iso.23220.1",
+                "family_name_unicode"
+              ]
+            },
+            {
+              "path": [
+                "org.iso.23220.1",
+                "given_name_unicode"
+              ]
+            },
+            {
+              "path": [
+                "org.iso.23220.1",
+                "age_over_18"
+              ]
+            }
+          ]
         }
       ]
     },

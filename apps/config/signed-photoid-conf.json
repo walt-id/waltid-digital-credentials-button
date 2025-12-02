@@ -8,7 +8,15 @@
           "format": "mso_mdoc",
           "meta": {
             "doctype_value": "org.iso.23220.photoID.1"
+          },
+          "claims": [
+          {
+            "path": [
+              "org.iso.23220.1",
+              "age_over_18"
+            ]
           }
+          ]
         }
       ]
     },
