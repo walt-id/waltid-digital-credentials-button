@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build the web-demo mock image from the repo root so all packages (including updated mocks) are included.
-docker build --no-cache -f apps/web-demo/Dockerfile-mock -t waltid/digital-credentials .
+# Build the web-demo image from the repo root so all packages are included.
+docker build --no-cache -f apps/web-demo/Dockerfile -t waltid/digital-credentials .
 
 # Push the freshly built image.
 docker push waltid/digital-credentials

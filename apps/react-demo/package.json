@@ -9,12 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@waltid/dc-mock-utils": "file:../../packages/dc-mock-utils",
     "@waltid/digital-credentials": "file:../../packages/digital-credentials",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@waltid/dc-backend-demo": "file:../../packages/dc-backend-demo",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
     "@vitejs/plugin-react": "^4.3.4",

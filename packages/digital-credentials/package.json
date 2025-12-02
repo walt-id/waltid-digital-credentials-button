@@ -33,7 +33,7 @@
     "@waltid/dc-client": "file:../dc-client"
   },
   "devDependencies": {
-    "@waltid/dc-mock-utils": "file:../dc-mock-utils",
+    "@waltid/dc-backend-demo": "file:../dc-backend-demo",
     "typescript": "^5.4.0",
     "vite": "^5.4.0"
   }
