@@ -140,7 +140,9 @@ function init(): void {
   }
 
   function maybeWarnUnsupported(): void {
+    console.log('Checking for Digital Credentials API support...');
     if (!hasDcApiSupport()) {
+       console.log('no support');
       logLine(
         'Digital Credentials API is not available in this browser. Please switch to a compatible browser.'
       );
@@ -150,9 +152,11 @@ function init(): void {
   function hasDcApiSupport(): boolean {
     const navHasGet =
       typeof (navigator as { credentials?: { get?: unknown } }).credentials?.get === 'function';
+    console.log('- navigator.credentials.get():', navHasGet);
     const globalDigitalCredential =
       typeof (window as { DigitalCredential?: unknown }).DigitalCredential !== 'undefined';
-    return navHasGet || globalDigitalCredential;
+    console.log('- window.DigitalCredential:', globalDigitalCredential);
+    return navHasGet && globalDigitalCredential;
   }
 
   function handleVerificationSuccess(response: unknown): void {
