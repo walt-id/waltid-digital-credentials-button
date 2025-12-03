@@ -28,6 +28,9 @@ Learn more about the Digital Credentials API:
 - [W3C Standard](https://www.w3.org/TR/digital-credentials/)
 - [Ecosystem Support](https://digitalcredentials.dev/ecosystem-support?support-matrix=dc-api)
 
+This project has been tested specifically with the following wallets:
+- [CM Wallet](https://github.com/digitalcredentialsdev/CMWallet)
+
 ## Packages
 - `@waltid/digital-credentials` — Web Component. `<digital-credentials-button>` fetches a DC request, calls `navigator.credentials.get`, and posts the response to your backend.
 - `@waltid/dc-client` — Core logic (no UI) to load a request, invoke the DC API, and post verification.
