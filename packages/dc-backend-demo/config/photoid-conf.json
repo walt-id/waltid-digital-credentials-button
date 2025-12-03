@@ -10,25 +10,24 @@
             "doctype_value": "org.iso.23220.photoID.1"
           },
           "claims": [
-          {
-            "path": [
-              "org.iso.23220.1",
-              "age_over_18"
-            ]
-          }
+            {
+              "path": [
+                "org.iso.23220.1",
+                "family_name_unicode"
+              ]
+            },
+            {
+              "path": [
+                "org.iso.23220.1",
+                "given_name_unicode"
+              ]
+            }
           ]
         }
       ]
     },
     "signed_request": true,
-    "encrypted_response": false,
-    "policies": {
-      "vcPolicies": [
-        {
-          "policy": "signature"
-        }
-      ]
-    },
+    "encrypted_response": true,
     "clientId": "x509_hash:abc-xyz-base64url-sha256-hash-of-der-x509-leaf",
     "key": {
       "type": "jwk",
@@ -43,6 +42,6 @@
     }
   },
   "expectedOrigins": [
-    "https://digital-credentials.walt.id"
+    "http://localhost:7003"
   ]
 }

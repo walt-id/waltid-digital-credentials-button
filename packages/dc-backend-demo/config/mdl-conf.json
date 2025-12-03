@@ -35,7 +35,7 @@
     "signed_request": false,
     "encrypted_response": true,
     "policies": {
-      "vcPolicies": [
+      "vc_policies": [
         {
           "policy": "signature"
         }
