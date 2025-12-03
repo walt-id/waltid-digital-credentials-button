@@ -24,6 +24,8 @@ Reusable Digital Credentials API web component plus a minimal demo backend. Incl
 
 **NOTE**: This project is still in development and is not yet ready for production use. It is still an experimental standard.
 
+Use our deployed version here: https://digital-credentials.walt.id
+
 Learn more about the Digital Credentials API:
 - [W3C Standard](https://www.w3.org/TR/digital-credentials/)
 - [Ecosystem Support](https://digitalcredentials.dev/ecosystem-support?support-matrix=dc-api)
