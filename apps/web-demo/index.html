@@ -40,14 +40,23 @@
             type="button"
             class="dc-btn dc-btn-secondary"
           >
-            Customize Request
+            Customize
           </button>
           <div style="margin-left: auto; display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-            <strong>Show Credential</strong>
-            <label class="toggle" aria-label="Toggle credential visibility">
-              <input type="checkbox" id="show-credential-toggle" />
-              <span class="toggle-slider"></span>
-            </label>
+            <div style="display: inline-flex; align-items: center; gap: 8px;">
+              <strong>Signed</strong>
+              <label class="toggle" aria-label="Toggle signed request">
+                <input type="checkbox" id="signed-toggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div style="display: inline-flex; align-items: center; gap: 8px;">
+              <strong>Encrypted</strong>
+              <label class="toggle" aria-label="Toggle encrypted response">
+                <input type="checkbox" id="encrypted-toggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
           </div>
         </div>
       </section>
@@ -67,6 +76,13 @@
           >
             Clear log
           </button>
+          <div style="margin-left: auto; display: inline-flex; align-items: center; gap: 8px;">
+            <strong>Show Credential</strong>
+            <label class="toggle" aria-label="Toggle credential visibility">
+              <input type="checkbox" id="show-credential-toggle" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
         </div>
 
         <h3>Event log</h3>
