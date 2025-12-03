@@ -37,9 +37,9 @@ This project has been tested specifically with the following wallets:
 - `@waltid/dc-backend-demo` — Lightweight dev-server middleware that creates verifier sessions from `packages/dc-backend-demo/config/*-conf.json` and exposes `/api/dc/request/:id` and `/api/dc/response`.
 
 ## Demos
-- `apps/web-demo` — vanilla TS with request selector, show-credential toggle, event log, and modal showing verified data.
-- `apps/react-demo` — same UX in React.
-- `apps/vue-demo` — same UX in Vue.
+- `apps/web-demo` — vanilla TS with request selector, toggles, event log, and modal showing verified data.
+- `apps/react-demo` — minimal React starter that only embeds `<digital-credentials-button>` to show integration.
+- `apps/vue-demo` — minimal Vue starter that only embeds `<digital-credentials-button>` to show integration.
 
 All demos talk to `/api/dc/request` and `/api/dc/response` served by the demo backend (Vite plugin).
 
@@ -58,7 +58,7 @@ npm run dev:web            # vanilla demo
 npm run dev:react          # React demo
 npm run dev:vue            # Vue demo
 ```
-Open the served URL (Vite defaults to 5173). Pick a request ID and click the button; the verified credential details appear in the modal if the browser supports the DC API.
+Open the served URL (Vite defaults to 5173). The web demo includes request selection, toggles, and logging; the React/Vue demos are minimal starters that simply render the web component pointed at the demo backend.
 
 ## Using the component
 ```html
@@ -123,4 +123,3 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="./assets/walt-banner.png" alt="walt.id banner" />
 </div>
-

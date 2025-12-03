@@ -3,4 +3,6 @@ import '@waltid/digital-credentials';
 import App from './App.vue';
 import './style.css';
 
-createApp(App).mount('#app');
+const app = createApp(App);
+app.config.compilerOptions.isCustomElement = (tag) => tag === 'digital-credentials-button';
+app.mount('#app');
