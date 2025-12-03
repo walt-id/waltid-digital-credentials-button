@@ -33,7 +33,7 @@
       ]
     },
     "signed_request": false,
-    "encrypted_response": true,
+    "encrypted_response": false,
     "policies": {
       "vc_policies": [
         {

@@ -68,8 +68,11 @@ async function init(): Promise<void> {
       dcButton.addEventListener('credential-request-loaded', (event) =>
         logJson('Digital Credentials API request', (event as CustomEvent).detail?.payload)
       );
-      dcButton.addEventListener('credential-dcapi-success', () =>
-        logLine('Digital Credentials API returned a credential response')
+      dcButton.addEventListener('credential-dcapi-success', (event) =>
+        logJson(
+          'Digital Credentials API returned a credential response',
+          (event as CustomEvent).detail?.response
+        )
       );
       dcButton.addEventListener('credential-dcapi-error', (event) =>
         logJson('Digital Credentials API error', (event as CustomEvent).detail?.error)

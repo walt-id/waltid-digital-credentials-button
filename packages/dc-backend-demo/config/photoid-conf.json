@@ -26,8 +26,8 @@
         }
       ]
     },
-    "signed_request": true,
-    "encrypted_response": true,
+    "signed_request": false,
+    "encrypted_response": false,
     "clientId": "x509_hash:abc-xyz-base64url-sha256-hash-of-der-x509-leaf",
     "key": {
       "type": "jwk",
