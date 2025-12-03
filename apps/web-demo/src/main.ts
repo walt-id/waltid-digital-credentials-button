@@ -6,6 +6,8 @@ const REQUEST_ENDPOINT = '/api/dc/request';
 const REQUEST_CONFIG_ENDPOINT = '/api/dc/request-config';
 const RESPONSE_ENDPOINT = '/api/dc/response';
 const DEFAULT_REQUEST_ID = 'unsigned-mdl';
+const SIGNED_REQUEST_KEY = 'dc-signed-request';
+const ENCRYPTED_RESPONSE_KEY = 'dc-encrypted-response';
 
 type MinimalCredential = {
   givenName?: string;
@@ -32,6 +34,8 @@ async function init(): Promise<void> {
   const customizeSave = document.getElementById('customize-save') as HTMLButtonElement | null;
   const customizeTextarea = document.getElementById('customize-textarea') as HTMLTextAreaElement | null;
   const customizeSubtitle = document.getElementById('customize-modal-subtitle') as HTMLDivElement | null;
+  const signedToggle = document.getElementById('signed-toggle') as HTMLInputElement | null;
+  const encryptedToggle = document.getElementById('encrypted-toggle') as HTMLInputElement | null;
   const showCredentialToggle = document.getElementById('show-credential-toggle') as HTMLInputElement | null;
   const modalBackdrop = document.getElementById('credential-modal-backdrop') as HTMLElement | null;
   const modalClose = document.getElementById('modal-close') as HTMLButtonElement | null;
@@ -43,13 +47,16 @@ async function init(): Promise<void> {
   const urlState = new URL(window.location.href);
   let requestId = urlState.searchParams.get('request-id') || DEFAULT_REQUEST_ID;
   let customPayload: unknown = readCustomPayload(requestId);
+  let signedEnabled = getSignedEnabled();
+  let encryptedEnabled = getEncryptedEnabled();
+  let payloadSyncToken = 0;
   const fallbackRequestIds = getRequestIdsFromSelect();
 
   await loadRequestOptions(fallbackRequestIds);
   primeButton();
   renderLog();
   wireEvents();
-  applyCustomPayload();
+  await refreshRequestPayload();
 
   function wireEvents(): void {
     if (dcButton) {
@@ -84,7 +91,7 @@ async function init(): Promise<void> {
         requestId = requestSelect.value;
         syncRequestIdToUrl(requestId);
         customPayload = readCustomPayload(requestId);
-        applyCustomPayload();
+        void refreshRequestPayload();
         primeButton();
         logLine(`request-id set to ${requestId}`);
       });
@@ -116,7 +123,7 @@ async function init(): Promise<void> {
         if (parsed === null) {
           clearCustomPayload(requestId);
           customPayload = undefined;
-          applyCustomPayload();
+          void refreshRequestPayload();
           closeCustomizeModal();
           logLine(`Custom payload cleared for ${requestId}`);
           return;
@@ -124,7 +131,7 @@ async function init(): Promise<void> {
 
         writeCustomPayload(requestId, parsed);
         customPayload = parsed;
-        applyCustomPayload();
+        void refreshRequestPayload();
         closeCustomizeModal();
         logLine(`Custom payload saved for ${requestId}`);
       });
@@ -132,6 +139,24 @@ async function init(): Promise<void> {
 
     if (customizeClose) {
       customizeClose.addEventListener('click', () => closeCustomizeModal());
+    }
+
+    if (signedToggle) {
+      signedToggle.checked = signedEnabled;
+      signedToggle.addEventListener('change', () => {
+        signedEnabled = signedToggle.checked;
+        setSignedEnabled(signedEnabled);
+        void refreshRequestPayload();
+      });
+    }
+
+    if (encryptedToggle) {
+      encryptedToggle.checked = encryptedEnabled;
+      encryptedToggle.addEventListener('change', () => {
+        encryptedEnabled = encryptedToggle.checked;
+        setEncryptedEnabled(encryptedEnabled);
+        void refreshRequestPayload();
+      });
     }
 
     if (showCredentialToggle) {
@@ -170,15 +195,59 @@ async function init(): Promise<void> {
     renderLog();
   }
 
-  function applyCustomPayload(): void {
+  async function refreshRequestPayload(): Promise<void> {
     if (!dcButton) return;
-    if (customPayload !== undefined) {
-      dcButton.setAttribute('request-payload', JSON.stringify(customPayload));
+
+    console.log('Refreshing request payload...');
+    console.log('- requestId:', requestId);
+    console.log('- signedEnabled:', signedEnabled);
+    console.log('- encryptedEnabled:', encryptedEnabled);
+    console.log('- customPayload:', customPayload);
+    console.log(dcButton.getAttribute('request-payload'));
+
+    const activeRequestId = requestId;
+    const activeSigned = signedEnabled;
+    const activeEncrypted = encryptedEnabled;
+    const currentSync = ++payloadSyncToken;
+    const storedPayload = isVerifierConfigPayload(customPayload) ? customPayload : undefined;
+    if (customPayload !== undefined && !storedPayload) {
+      clearCustomPayload(activeRequestId);
+    }
+    const basePayload = storedPayload ?? (await fetchRequestConfig(activeRequestId));
+    if (
+      activeRequestId !== requestId ||
+      activeSigned !== signedEnabled ||
+      activeEncrypted !== encryptedEnabled ||
+      currentSync !== payloadSyncToken
+    ) {
+      return;
+    }
+    if (!basePayload || typeof basePayload !== 'object') {
+      dcButton.removeAttribute('request-payload');
+      dcButton.removeAttribute('data-has-custom-payload');
+      return;
+    }
+
+    const patched = applySigningOptions(basePayload, activeSigned, activeEncrypted);
+    if (!patched || typeof patched !== 'object') {
+      dcButton.removeAttribute('request-payload');
+      dcButton.removeAttribute('data-has-custom-payload');
+      return;
+    }
+
+    if (currentSync !== payloadSyncToken) return;
+
+    try {
+      dcButton.setAttribute('request-payload', JSON.stringify(patched));
       dcButton.setAttribute('data-has-custom-payload', 'true');
-    } else {
+    } catch (error) {
+      console.error('Failed to serialize request payload', error);
       dcButton.removeAttribute('request-payload');
       dcButton.removeAttribute('data-has-custom-payload');
     }
+
+    console.log('Updated request payload:');
+    console.log(dcButton.getAttribute('request-payload'));
   }
 
   async function loadRequestOptions(fallbackIds: string[]): Promise<void> {
@@ -201,7 +270,7 @@ async function init(): Promise<void> {
 
     requestSelect.value = requestId;
     customPayload = readCustomPayload(requestId);
-    applyCustomPayload();
+    await refreshRequestPayload();
   }
 
   async function fetchRequestIds(): Promise<string[]> {
@@ -251,7 +320,11 @@ async function init(): Promise<void> {
 
   async function openCustomizeModal(): Promise<void> {
     if (!customizeModal || !customizeTextarea || !customizeSubtitle) return;
-    const basePayload = customPayload ?? (await fetchRequestConfig(requestId));
+    const storedPayload = isVerifierConfigPayload(customPayload) ? customPayload : undefined;
+    const basePayload = storedPayload ?? (await fetchRequestConfig(requestId));
+    if (customPayload !== undefined && !storedPayload) {
+      clearCustomPayload(requestId);
+    }
     customizeSubtitle.textContent = `Request: ${requestId}`;
     customizeTextarea.value = basePayload ? JSON.stringify(basePayload, null, 2) : '';
     customizeModal.hidden = false;
@@ -289,7 +362,11 @@ async function init(): Promise<void> {
     try {
       const raw = localStorage.getItem(customPayloadKey(id));
       if (!raw) return undefined;
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (!isVerifierConfigPayload(parsed)) {
+        return undefined;
+      }
+      return parsed;
     } catch (error) {
       console.error('Failed to read custom payload', error);
       return undefined;
@@ -308,6 +385,34 @@ async function init(): Promise<void> {
     return `dc-custom-payload:${id}`;
   }
 
+  function applySigningOptions(payload: unknown, signed: boolean, encrypted: boolean): unknown {
+    const clone = cloneJson(payload);
+    if (!clone || typeof clone !== 'object') return payload;
+    const core = (clone as { core?: unknown }).core;
+    if (core && typeof core === 'object') {
+      (core as Record<string, unknown>).signed_request = signed;
+      (core as Record<string, unknown>).encrypted_response = encrypted;
+    }
+    return clone;
+  }
+
+  function cloneJson<T>(value: T): T | null {
+    try {
+      return JSON.parse(JSON.stringify(value)) as T;
+    } catch (error) {
+      console.error('Failed to clone JSON payload', error);
+      return null;
+    }
+  }
+
+  function isVerifierConfigPayload(input: unknown): input is Record<string, unknown> {
+    if (!input || typeof input !== 'object') return false;
+    const obj = input as Record<string, unknown>;
+    if (typeof obj.flow_type === 'string') return true;
+    if (obj.core && typeof obj.core === 'object') return true;
+    return false;
+  }
+
   function primeButton(): void {
     if (!dcButton) return;
     dcButton.setAttribute('request-id', requestId);
@@ -315,17 +420,50 @@ async function init(): Promise<void> {
     dcButton.setAttribute('response-endpoint', RESPONSE_ENDPOINT);
   }
 
+  function getSignedEnabled(): boolean {
+    return readBooleanSetting(SIGNED_REQUEST_KEY, false);
+  }
+
+  function setSignedEnabled(next: boolean): void {
+    writeBooleanSetting(SIGNED_REQUEST_KEY, next);
+  }
+
+  function getEncryptedEnabled(): boolean {
+    return readBooleanSetting(ENCRYPTED_RESPONSE_KEY, false);
+  }
+
+  function setEncryptedEnabled(next: boolean): void {
+    writeBooleanSetting(ENCRYPTED_RESPONSE_KEY, next);
+  }
+
   function getShowCredentialEnabled(): boolean {
-    const stored = localStorage.getItem('dc-show-credential');
-    if (stored === null) {
-      localStorage.setItem('dc-show-credential', 'true');
-      return true;
-    }
-    return stored === 'true';
+    return readBooleanSetting('dc-show-credential', true);
   }
 
   function setShowCredentialEnabled(next: boolean): void {
-    localStorage.setItem('dc-show-credential', String(next));
+    writeBooleanSetting('dc-show-credential', next);
+  }
+
+  function readBooleanSetting(key: string, defaultValue: boolean): boolean {
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored === null) {
+        localStorage.setItem(key, String(defaultValue));
+        return defaultValue;
+      }
+      return stored === 'true';
+    } catch (error) {
+      console.error(`Failed to read ${key} from localStorage`, error);
+      return defaultValue;
+    }
+  }
+
+  function writeBooleanSetting(key: string, next: boolean): void {
+    try {
+      localStorage.setItem(key, String(next));
+    } catch (error) {
+      console.error(`Failed to store ${key} in localStorage`, error);
+    }
   }
 
   function maybeWarnUnsupported(): void {

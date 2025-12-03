@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const REQUEST_ENDPOINT = '/api/dc/request';
 const RESPONSE_ENDPOINT = '/api/dc/response';
+const REQUEST_CONFIG_ENDPOINT = '/api/dc/request-config';
+const SIGNED_REQUEST_KEY = 'dc-signed-request';
+const ENCRYPTED_RESPONSE_KEY = 'dc-encrypted-response';
 
 type MinimalCredential = {
   givenName?: string;
@@ -15,6 +18,8 @@ type MinimalCredential = {
 const urlState = new URL(window.location.href);
 const requestId = ref(urlState.searchParams.get('request-id') || 'unsigned-mdl');
 const showCredential = ref(resolveShowCredential());
+const signedEnabled = ref(resolveSignedEnabled());
+const encryptedEnabled = ref(resolveEncryptedEnabled());
 const logEntries = ref<string[]>([]);
 const logContent = computed(() =>
   logEntries.value.length ? logEntries.value.join('\n\n') : '(click the button to start)'
@@ -23,6 +28,7 @@ const logContent = computed(() =>
 const modalVisible = ref(false);
 const credential = ref<MinimalCredential>({});
 const btnRef = ref<HTMLElement | null>(null);
+let payloadSyncToken = 0;
 
 const logLine = (message: string) => {
   logEntries.value = [...logEntries.value, message];
@@ -44,7 +50,19 @@ const hideModal = () => {
 const toggleShowCredential = () => {
   const next = !showCredential.value;
   showCredential.value = next;
-  localStorage.setItem('dc-show-credential', String(next));
+  writeBooleanSetting('dc-show-credential', next);
+};
+
+const toggleSigned = () => {
+  const next = !signedEnabled.value;
+  signedEnabled.value = next;
+  writeBooleanSetting(SIGNED_REQUEST_KEY, next);
+};
+
+const toggleEncrypted = () => {
+  const next = !encryptedEnabled.value;
+  encryptedEnabled.value = next;
+  writeBooleanSetting(ENCRYPTED_RESPONSE_KEY, next);
 };
 
 const handleRequestChange = (value: string) => {
@@ -56,10 +74,40 @@ const handleRequestChange = (value: string) => {
   logLine(`request-id set to ${value}`);
 };
 
+const syncRequestPayload = async () => {
+  const currentSync = ++payloadSyncToken;
+  const el = btnRef.value;
+  if (!el) return;
+  const activeRequestId = requestId.value;
+  const baseConfig = await fetchRequestConfig(activeRequestId);
+  if (currentSync !== payloadSyncToken || activeRequestId !== requestId.value) return;
+  if (!baseConfig || typeof baseConfig !== 'object') {
+    el.removeAttribute('request-payload');
+    return;
+  }
+  const patched = applySigningOptions(baseConfig, signedEnabled.value, encryptedEnabled.value);
+  if (!patched || typeof patched !== 'object') {
+    el.removeAttribute('request-payload');
+    return;
+  }
+  if (currentSync !== payloadSyncToken) return;
+  try {
+    el.setAttribute('request-payload', JSON.stringify(patched));
+  } catch (error) {
+    console.error('Failed to serialize request payload', error);
+    el.removeAttribute('request-payload');
+  }
+};
+
+watch([requestId, signedEnabled, encryptedEnabled], () => {
+  void syncRequestPayload();
+}, { immediate: true });
+
 onMounted(() => {
   const el = btnRef.value;
   if (!el) return;
   primeButton();
+  void syncRequestPayload();
 
   const handleStarted = () => {
     hideModal();
@@ -120,12 +168,37 @@ function primeButton(): void {
 }
 
 function resolveShowCredential(): boolean {
-  const stored = localStorage.getItem('dc-show-credential');
-  if (stored === null) {
-    localStorage.setItem('dc-show-credential', 'true');
-    return true;
+  return readBooleanSetting('dc-show-credential', true);
+}
+
+function resolveSignedEnabled(): boolean {
+  return readBooleanSetting(SIGNED_REQUEST_KEY, false);
+}
+
+function resolveEncryptedEnabled(): boolean {
+  return readBooleanSetting(ENCRYPTED_RESPONSE_KEY, false);
+}
+
+function readBooleanSetting(key: string, defaultValue: boolean): boolean {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored === null) {
+      localStorage.setItem(key, String(defaultValue));
+      return defaultValue;
+    }
+    return stored === 'true';
+  } catch (error) {
+    console.error(`Failed to read ${key} from localStorage`, error);
+    return defaultValue;
   }
-  return stored === 'true';
+}
+
+function writeBooleanSetting(key: string, next: boolean): void {
+  try {
+    localStorage.setItem(key, String(next));
+  } catch (error) {
+    console.error(`Failed to store ${key} in localStorage`, error);
+  }
 }
 
 function extractFirstCredential(input: unknown): MinimalCredential {
@@ -170,6 +243,41 @@ function hasDcApiSupport(): boolean {
     typeof (window as { DigitalCredential?: unknown }).DigitalCredential !== 'undefined';
   return navHasGet || globalDigitalCredential;
 }
+
+async function fetchRequestConfig(requestId: string): Promise<unknown> {
+  const url = `${REQUEST_CONFIG_ENDPOINT}/${encodeURIComponent(requestId)}`;
+  try {
+    const response = await fetch(url, { headers: { accept: 'application/json' }, cache: 'no-store' });
+    if (!response.ok) {
+      console.error(`Failed to fetch request config for ${requestId}: ${response.status}`);
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to read request config', error);
+    return null;
+  }
+}
+
+function applySigningOptions(payload: unknown, signed: boolean, encrypted: boolean): unknown {
+  const clone = cloneJson(payload);
+  if (!clone || typeof clone !== 'object') return payload;
+  const core = (clone as { core?: unknown }).core;
+  if (core && typeof core === 'object') {
+    (core as Record<string, unknown>).signed_request = signed;
+    (core as Record<string, unknown>).encrypted_response = encrypted;
+  }
+  return clone;
+}
+
+function cloneJson<T>(value: T): T | null {
+  try {
+    return JSON.parse(JSON.stringify(value)) as T;
+  } catch (error) {
+    console.error('Failed to clone JSON payload', error);
+    return null;
+  }
+}
 </script>
 
 <template>
@@ -201,6 +309,20 @@ function hasDcApiSupport(): boolean {
           <option value="signed-photoid">signed-photoid</option>
         </select>
         <div style="margin-left: auto; display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="display: inline-flex; align-items: center; gap: 6px;">
+            <strong>Signed</strong>
+            <label class="toggle" aria-label="Toggle signed request">
+              <input type="checkbox" :checked="signedEnabled" @change="toggleSigned" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div style="display: inline-flex; align-items: center; gap: 6px;">
+            <strong>Encrypted</strong>
+            <label class="toggle" aria-label="Toggle encrypted response">
+              <input type="checkbox" :checked="encryptedEnabled" @change="toggleEncrypted" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
           <div style="display: inline-flex; align-items: center; gap: 6px;">
             <strong>Show Credential</strong>
             <label class="toggle" aria-label="Toggle credential visibility">
