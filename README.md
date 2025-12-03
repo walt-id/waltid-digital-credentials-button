@@ -49,6 +49,105 @@ All demos talk to `/api/dc/request` and `/api/dc/response` served by the demo ba
 - Default verifier base: `https://verifier2.portal.test.waltid.cloud` (override with `VERIFIER_BASE` or `dcDemoBackend({ verifierBase })`).
 - Request IDs available out of the box: `unsigned-mdl`, `signed-mdl`, `encrypted-mdl`, `unsigned-encrypted-mdl`, `signed-encrypted-mdl`, `unsigned-photoid`, `signed-photoid`.
 
+## Step-by-Step Flow
+
+The Digital Credentials flow involves three main components working together: the **web component** (client), the **middleware backend**, and the **verifier service**. Here's how they interact:
+
+### 1. User Initiates Request
+When a user clicks the `<digital-credentials-button>`, the web component begins the credential request flow.
+
+### 2. Fetch Request Payload (Client → Middleware → Verifier)
+```
+Client                    Middleware                    Verifier Service
+  |                            |                              |
+  |-- GET /api/dc/request/:id->|                              |
+  |                            |-- Read config file           |
+  |                            |   (config/{id}-conf.json)    |
+  |                            |                              |
+  |                            |-- POST /verification-session |
+  |                            |   /create                    |
+  |                            |   (with config JSON) ------->|
+  |                            |                              |
+  |                            |<-- sessionId ----------------|
+  |                            |                              |
+  |                            |-- GET /verification-session/  |
+  |                            |   {sessionId}/request ------>|
+  |                            |                              |
+  |                            |<-- DC API request payload ---|
+  |                            |                              |
+  |<-- DC API request payload--|                              |
+```
+
+**Details:**
+- The client sends a `GET` request to `/api/dc/request/:requestId`
+- The middleware reads the corresponding config file from `packages/dc-backend-demo/config/{requestId}-conf.json`
+- The middleware creates a verification session by posting the config to `{VERIFIER_BASE}/verification-session/create`
+- The verifier returns a `sessionId` which the middleware stores
+- The middleware fetches the DC API request payload from `{VERIFIER_BASE}/verification-session/{sessionId}/request`
+- The middleware returns this payload to the client
+
+### 3. Invoke Digital Credentials API (Client → Browser)
+```
+Client                    Browser/Wallet
+  |                            |
+  |-- navigator.credentials.get|
+  |   (with request payload) ->|
+  |                            |
+  |                            |-- User selects credential    |
+  |                            |   and approves request       |
+  |                            |                              |
+  |<-- Credential response ----|
+```
+
+**Details:**
+- The client calls `navigator.credentials.get()` with the request payload
+- If the browser supports the DC API, it opens the wallet interface
+- The user selects and approves the credential request
+- The browser/wallet returns the credential response
+
+### 4. Post Verification (Client → Middleware → Verifier)
+```
+Client                    Middleware                    Verifier Service
+  |                            |                              |
+  |-- POST /api/dc/response   |                              |
+  |   (with credential) ------>|                              |
+  |                            |-- Lookup sessionId           |
+  |                            |   (from stored sessions)     |
+  |                            |                              |
+  |                            |-- POST /verification-session |
+  |                            |   /{sessionId}/response     |
+  |                            |   (with credential) ------->|
+  |                            |                              |
+  |                            |-- Poll GET /verification-    |
+  |                            |   session/{sessionId}/info ->|
+  |                            |   (until status !=          |
+  |                            |    "processing")             |
+  |                            |                              |
+  |                            |<-- Verification result ------|
+  |                            |                              |
+  |<-- Verification result ----|                              |
+```
+
+**Details:**
+- The client sends a `POST` request to `/api/dc/response` with the credential response
+- The middleware retrieves the stored `sessionId` for the request
+- The middleware forwards the credential to `{VERIFIER_BASE}/verification-session/{sessionId}/response`
+- The middleware polls `{VERIFIER_BASE}/verification-session/{sessionId}/info` until verification completes (status is no longer "processing" or "received")
+- The middleware returns the verification result to the client
+- The web component emits events (`credential-verification-success` or `credential-verification-error`) with the result
+
+### Flow Summary
+1. **Request Phase**: Client requests → Middleware creates verifier session → Verifier returns DC API payload → Client receives payload
+2. **DC API Phase**: Client invokes `navigator.credentials.get()` → User approves in wallet → Browser returns credential
+3. **Verification Phase**: Client posts credential → Middleware forwards to verifier → Verifier processes → Middleware polls for result → Client receives verification
+
+### Error Handling
+At each stage, errors are caught and emitted as events:
+- `credential-request-loaded` - Request payload successfully fetched
+- `credential-dcapi-error` - DC API call failed (e.g., user cancelled, unsupported browser)
+- `credential-verification-error` - Verification failed (e.g., invalid credential, verifier error)
+- `credential-error` - Generic error at any stage
+
 ## Quick start
 ```bash
 npm install
