@@ -18,7 +18,7 @@
   </p>
 </div>
 
-# Digital Credentials Button Monorepo
+## Digital Credentials Button Monorepo
 
 Reusable Digital Credentials API web component plus a minimal demo backend. Includes vanilla, React, and Vue demos that hit real verifier endpoints through the in-repo backend middleware.
 
@@ -121,6 +121,6 @@ export default defineConfig({
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
 <div align="center">
-<img src="../../assets/walt-banner.png" alt="walt.id banner" />
+<img src="./assets/walt-banner.png" alt="walt.id banner" />
 </div>
 
