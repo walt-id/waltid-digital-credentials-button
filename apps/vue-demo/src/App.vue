@@ -66,6 +66,21 @@ const pushLog = (label: string, payload?: unknown) => {
 </script>
 
 <template>
+  <a
+    class="github-link"
+    href="https://github.com/walt-id/waltid-digital-credentials-button"
+    target="_blank"
+    rel="noreferrer noopener"
+    aria-label="View the source on GitHub"
+  >
+    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M8 0a8 8 0 0 0-2.53 15.59c.4.08.55-.17.55-.38v-1.33c-2.24.49-2.71-1.08-2.71-1.08-.36-.93-.88-1.18-.88-1.18-.72-.49.05-.48.05-.48.8.06 1.22.82 1.22.82.71 1.22 1.87.86 2.33.66.07-.52.28-.87.5-1.07-1.79-.2-3.67-.9-3.67-3.97 0-.88.31-1.6.82-2.16-.08-.2-.36-1.01.08-2.1 0 0 .67-.22 2.2.82a7.64 7.64 0 0 1 4 0c1.52-1.04 2.2-.82 2.2-.82.44 1.09.16 1.9.08 2.1.51.56.82 1.28.82 2.16 0 3.08-1.88 3.77-3.67 3.97.28.24.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0Z"
+      />
+    </svg>
+    <span>GitHub</span>
+  </a>
   <main class="container">
     <h1>Digital Credentials Button (Vue)</h1>
     <p class="lead">
