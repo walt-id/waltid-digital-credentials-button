@@ -107,25 +107,12 @@
       <div id="credential-modal-backdrop" class="modal-backdrop" hidden>
         <div class="modal license-card">
           <div class="license-header">
-            <div class="license-title">Driving License</div>
+            <div class="license-title" id="credential-title">Credential Details</div>
             <button id="modal-close" type="button" aria-label="Close credential modal">&times;</button>
           </div>
           <div class="license-body">
             <div class="license-photo">PHOTO</div>
-            <div class="license-fields">
-              <div class="field">
-                <span class="label">First Name</span>
-                <span class="value" id="dl-first-name">—</span>
-              </div>
-              <div class="field">
-                <span class="label">Family Name</span>
-                <span class="value" id="dl-family-name">—</span>
-              </div>
-              <div class="field">
-                <span class="label">Age over 21</span>
-                <span class="value" id="dl-age-over-21">—</span>
-              </div>
-            </div>
+            <div class="license-fields" id="credential-fields"></div>
           </div>
           <div class="license-footer">
             <span class="issuer" id="dl-issuer">Issuer: —</span>

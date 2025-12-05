@@ -284,6 +284,12 @@ digital-credentials-button::part(button)::before {
   color: #475569;
 }
 
+.field .namespace {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: none;
+}
+
 .field .value {
   font-size: 1rem;
   font-weight: 700;

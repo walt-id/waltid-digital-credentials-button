@@ -9,11 +9,16 @@ const DEFAULT_REQUEST_ID = 'unsigned-mdl';
 const SIGNED_REQUEST_KEY = 'dc-signed-request';
 const ENCRYPTED_RESPONSE_KEY = 'dc-encrypted-response';
 
-type MinimalCredential = {
-  givenName?: string;
-  familyName?: string;
-  ageOver21?: boolean;
+type ClaimField = {
+  key: string;
+  namespace: string;
+  value: string;
+};
+
+type CredentialDisplay = {
+  fields: ClaimField[];
   issuer?: string;
+  docType?: string;
 };
 
 if (document.readyState === 'loading') {
@@ -39,9 +44,8 @@ async function init(): Promise<void> {
   const showCredentialToggle = document.getElementById('show-credential-toggle') as HTMLInputElement | null;
   const modalBackdrop = document.getElementById('credential-modal-backdrop') as HTMLElement | null;
   const modalClose = document.getElementById('modal-close') as HTMLButtonElement | null;
-  const dlFirst = document.getElementById('dl-first-name');
-  const dlFamily = document.getElementById('dl-family-name');
-  const dlAge = document.getElementById('dl-age-over-21');
+  const credentialFields = document.getElementById('credential-fields');
+  const credentialTitle = document.getElementById('credential-title');
   const dlIssuer = document.getElementById('dl-issuer');
 
   const urlState = new URL(window.location.href);
@@ -497,16 +501,11 @@ async function init(): Promise<void> {
   }
 
   function showCredentialModal(data: unknown): void {
-    if (!modalBackdrop || !dlFirst || !dlFamily || !dlAge || !dlIssuer) return;
-    const cred = extractFirstCredential(data);
-    dlFirst.textContent = cred.givenName || '—';
-    dlFamily.textContent = cred.familyName || '—';
-    if (typeof cred.ageOver21 === 'boolean') {
-      dlAge.textContent = cred.ageOver21 ? 'Yes' : 'No';
-    } else {
-      dlAge.textContent = '—';
-    }
-    dlIssuer.textContent = `Issuer: ${cred.issuer || '—'}`;
+    if (!modalBackdrop || !credentialFields || !dlIssuer || !credentialTitle) return;
+    const display = extractCredentialDisplay(data);
+    renderClaimFields(credentialFields, display?.fields ?? []);
+    credentialTitle.textContent = display?.docType || 'Credential Details';
+    dlIssuer.textContent = `Issuer: ${display?.issuer || '—'}`;
     modalBackdrop.hidden = false;
     modalBackdrop.style.display = 'flex';
   }
@@ -516,43 +515,121 @@ async function init(): Promise<void> {
     modalBackdrop.hidden = true;
     modalBackdrop.style.display = 'none';
   }
-
-  function extractFirstCredential(input: unknown): MinimalCredential {
-    if (!input || typeof input !== 'object') return {};
-    const presented = extractFromPresentedCredentials(input);
-    if (presented) return presented;
-
-    const asObj = input as { credentials?: unknown };
-    const cred = Array.isArray(asObj.credentials) ? asObj.credentials[0] : (input as any);
-    if (!cred || typeof cred !== 'object') return {};
-    const claims = (cred as any).claims || {};
-    return {
-      givenName: claims['given_name']?.value ?? claims['given_name'] ?? undefined,
-      familyName: claims['family_name']?.value ?? claims['family_name'] ?? undefined,
-      issuer: (cred as any).issuerInfo?.commonName || (cred as any).issuer || undefined
-    };
-  }
-
-  function extractFromPresentedCredentials(input: unknown): MinimalCredential | null {
-    const data = input as {
-      presentedCredentials?: { my_mdl?: Array<{ credentialData?: Record<string, unknown> }> };
-    };
-    const first = Array.isArray(data.presentedCredentials?.my_mdl)
-      ? data.presentedCredentials?.my_mdl[0]
-      : undefined;
-    const isoData = first?.credentialData?.['org.iso.18013.5.1'];
-    if (!isoData || typeof isoData !== 'object') return null;
-    const claims = isoData as Record<string, unknown>;
-    const ageRaw = claims['age_over_21'] ?? claims['ageOver21'];
-
-    return {
-      givenName: (claims['given_name'] ?? claims['givenName']) as string | undefined,
-      familyName: (claims['family_name'] ?? claims['familyName']) as string | undefined,
-      ageOver21: typeof ageRaw === 'boolean' ? ageRaw : undefined
-    };
-  }
 }
 
 function handleInitError(error: unknown): void {
   console.error('Failed to initialize web demo', error);
+}
+
+const NAMESPACE_WHITELIST = ['org.iso.18013.5.1', 'org.iso.23220.1'];
+
+function extractCredentialDisplay(input: unknown): CredentialDisplay | null {
+  const presented = (input as {
+    presentedCredentials?: Record<string, Array<{ credentialData?: Record<string, unknown> }>>;
+  }).presentedCredentials;
+  if (!presented || typeof presented !== 'object') return null;
+
+  for (const list of Object.values(presented)) {
+    if (!Array.isArray(list)) continue;
+    for (const cred of list) {
+      const credentialData = (cred as { credentialData?: unknown }).credentialData;
+      const fields = flattenCredentialClaims(credentialData);
+      if (fields.length) {
+        return {
+          fields,
+          docType: typeof (credentialData as { docType?: unknown })?.docType === 'string'
+            ? (credentialData as { docType?: unknown }).docType
+            : undefined,
+          issuer: readIssuer(cred)
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+function flattenCredentialClaims(credentialData: unknown): ClaimField[] {
+  if (!credentialData || typeof credentialData !== 'object') return [];
+  const fields: ClaimField[] = [];
+  const asObj = credentialData as Record<string, unknown>;
+
+  for (const [namespace, claims] of Object.entries(asObj)) {
+    if (namespace === 'docType') continue;
+    if (!NAMESPACE_WHITELIST.some((allowed) => namespace.includes(allowed))) continue;
+    if (!claims || typeof claims !== 'object' || Array.isArray(claims)) continue;
+
+    for (const [key, value] of Object.entries(claims as Record<string, unknown>)) {
+      fields.push({
+        namespace,
+        key,
+        value: formatClaimValue(value)
+      });
+    }
+  }
+
+  return fields;
+}
+
+function renderClaimFields(container: HTMLElement, fields: ClaimField[]): void {
+  container.innerHTML = '';
+  if (!fields.length) {
+    const empty = document.createElement('div');
+    empty.className = 'field muted';
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = 'No claims found';
+    const value = document.createElement('span');
+    value.className = 'value';
+    value.textContent = '—';
+    empty.appendChild(label);
+    empty.appendChild(value);
+    container.appendChild(empty);
+    return;
+  }
+
+  fields.forEach((field) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field';
+
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = field.key;
+
+    const namespace = document.createElement('span');
+    namespace.className = 'namespace';
+    namespace.textContent = field.namespace;
+
+    const value = document.createElement('span');
+    value.className = 'value';
+    value.textContent = field.value;
+
+    const labelRow = document.createElement('div');
+    labelRow.style.display = 'flex';
+    labelRow.style.flexDirection = 'column';
+    labelRow.appendChild(label);
+    labelRow.appendChild(namespace);
+
+    wrapper.appendChild(labelRow);
+    wrapper.appendChild(value);
+    container.appendChild(wrapper);
+  });
+}
+
+function formatClaimValue(value: unknown): string {
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function readIssuer(input: unknown): string | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const asObj = input as Record<string, unknown>;
+  const issuerInfo = asObj['issuerInfo'] as { commonName?: string } | undefined;
+  return issuerInfo?.commonName || (typeof asObj['issuer'] === 'string' ? asObj['issuer'] : undefined);
 }
