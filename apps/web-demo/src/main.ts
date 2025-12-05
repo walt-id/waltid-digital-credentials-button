@@ -1,5 +1,8 @@
 import '@waltid/digital-credentials';
 import './style.css';
+import hljs from 'highlight.js/lib/core';
+import jsonLang from 'highlight.js/lib/languages/json';
+import 'highlight.js/styles/github-dark.css';
 
 const REQUEST_LIST_ENDPOINT = '/api/dc/requests';
 const REQUEST_ENDPOINT = '/api/dc/request';
@@ -33,15 +36,21 @@ type PolicyDisplay = {
   overallSuccess?: boolean;
 };
 
+type LogEntry =
+  | { kind: 'text'; message: string }
+  | { kind: 'json'; label: string; payload: unknown };
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => void init().catch(handleInitError));
 } else {
   void init().catch(handleInitError);
 }
 
+hljs.registerLanguage('json', jsonLang);
+
 async function init(): Promise<void> {
-  const logEntries: string[] = [];
-  const logEl = document.getElementById('log') as HTMLPreElement | null;
+  const logEntries: LogEntry[] = [];
+  const logEl = document.getElementById('log');
   const dcButton = document.getElementById('demo-btn') as HTMLElement | null;
   const requestSelect = document.getElementById('request-select') as HTMLSelectElement | null;
   const clearLogBtn = document.getElementById('clear-log') as HTMLButtonElement | null;
@@ -200,18 +209,52 @@ async function init(): Promise<void> {
 
   function renderLog(): void {
     if (!logEl) return;
-    logEl.textContent = logEntries.length ? logEntries.join('\n\n') : '(click the button to start)';
+    logEl.innerHTML = '';
+    if (!logEntries.length) {
+      const empty = document.createElement('div');
+      empty.className = 'log-empty';
+      empty.textContent = '(click the button to start)';
+      logEl.appendChild(empty);
+      return;
+    }
+
+    logEntries.forEach((entry) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'log-entry';
+
+      if (entry.kind === 'text') {
+        const pre = document.createElement('pre');
+        pre.className = 'log-text';
+        pre.textContent = entry.message;
+        wrapper.appendChild(pre);
+      } else {
+        const label = document.createElement('div');
+        label.className = 'log-label';
+        label.textContent = entry.label;
+
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.className = 'language-json log-json';
+        const pretty = JSON.stringify(entry.payload, null, 2);
+        code.innerHTML = hljs.highlight(pretty, { language: 'json' }).value;
+        pre.appendChild(code);
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(pre);
+      }
+
+      logEl.appendChild(wrapper);
+    });
   }
 
   function logLine(message: string): void {
     console.log(message);
-    logEntries.push(message);
+    logEntries.push({ kind: 'text', message });
     renderLog();
   }
 
   function logJson(label: string, payload: unknown): void {
-    const pretty = JSON.stringify(payload, null, 2);
-    logEntries.push(`${label}:\n${pretty}`);
+    logEntries.push({ kind: 'json', label, payload });
     renderLog();
   }
 

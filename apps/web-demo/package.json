@@ -9,7 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@waltid/digital-credentials": "file:../../packages/digital-credentials"
+    "@waltid/digital-credentials": "file:../../packages/digital-credentials",
+    "highlight.js": "^11.11.1"
   },
   "devDependencies": {
     "@waltid/dc-backend-demo": "file:../../packages/dc-backend-demo",
