@@ -42,6 +42,6 @@
     }
   },
   "expectedOrigins": [
-    "http://localhost:7003"
+    "https://digital-credentials.walt.id"
   ]
 }

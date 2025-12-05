@@ -22,25 +22,25 @@ body {
   gap: 8px;
   padding: 8px 12px;
   border-radius: 999px;
-  background: #0f172a;
-  color: #f8fafc;
+  background: #f8fafc;
+  color: #0f172a;
   text-decoration: none;
   font-weight: 700;
   font-size: 0.92rem;
-  border: 1px solid #1f2937;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
-  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, color 120ms ease;
 }
 
 .github-link:hover {
-  background: #111827;
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.2);
+  background: #f1f5f9;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.1);
   transform: translateY(-1px);
 }
 
 .github-link:active {
   transform: translateY(0);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
 }
 
 .github-link svg {
