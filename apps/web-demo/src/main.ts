@@ -21,6 +21,18 @@ type CredentialDisplay = {
   docType?: string;
 };
 
+type PolicyResult = {
+  name: string;
+  credential?: string;
+  success: boolean;
+};
+
+type PolicyDisplay = {
+  vpPolicies: PolicyResult[];
+  vcPolicies: PolicyResult[];
+  overallSuccess?: boolean;
+};
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => void init().catch(handleInitError));
 } else {
@@ -47,6 +59,7 @@ async function init(): Promise<void> {
   const credentialFields = document.getElementById('credential-fields');
   const credentialTitle = document.getElementById('credential-title');
   const dlIssuer = document.getElementById('dl-issuer');
+  const policyResults = document.getElementById('policy-results');
 
   const urlState = new URL(window.location.href);
   let requestId = urlState.searchParams.get('request-id') || DEFAULT_REQUEST_ID;
@@ -503,9 +516,13 @@ async function init(): Promise<void> {
   function showCredentialModal(data: unknown): void {
     if (!modalBackdrop || !credentialFields || !dlIssuer || !credentialTitle) return;
     const display = extractCredentialDisplay(data);
+    const policies = extractPolicyDisplay(data);
     renderClaimFields(credentialFields, display?.fields ?? []);
     credentialTitle.textContent = display?.docType || 'Credential Details';
     dlIssuer.textContent = `Issuer: ${display?.issuer || '—'}`;
+    if (policyResults) {
+      renderPolicyResults(policyResults, policies);
+    }
     modalBackdrop.hidden = false;
     modalBackdrop.style.display = 'flex';
   }
@@ -547,6 +564,45 @@ function extractCredentialDisplay(input: unknown): CredentialDisplay | null {
   }
 
   return null;
+}
+
+function extractPolicyDisplay(input: unknown): PolicyDisplay {
+  const policyResults = (input as { policyResults?: unknown }).policyResults as
+    | Record<string, unknown>
+    | undefined;
+  const vpContainer =
+    (policyResults as { vp_policies?: unknown })?.vp_policies ??
+    (policyResults as { vp_policies?: { vp_policies?: unknown } })?.vp_policies?.vp_policies;
+
+  const vpPolicies: PolicyResult[] = [];
+  if (vpContainer && typeof vpContainer === 'object') {
+    for (const [credential, policies] of Object.entries(vpContainer)) {
+      if (!policies || typeof policies !== 'object') continue;
+      for (const [key, payload] of Object.entries(policies as Record<string, unknown>)) {
+        if (!payload || typeof payload !== 'object') continue;
+        const success = Boolean((payload as { success?: unknown }).success);
+        const name =
+          (payload as { policy_executed?: { policy?: string } }).policy_executed?.policy ||
+          key;
+        vpPolicies.push({ name, credential, success });
+      }
+    }
+  }
+
+  const vcPolicies: PolicyResult[] = [];
+  const vcContainer = (policyResults as { vc_policies?: unknown })?.vc_policies;
+  if (Array.isArray(vcContainer)) {
+    vcContainer.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      const asObj = item as { policy?: { policy?: string }; success?: unknown };
+      const name = asObj.policy?.policy || 'VC policy';
+      vcPolicies.push({ name, success: Boolean(asObj.success) });
+    });
+  }
+
+  const overallSuccess = (policyResults as { overallSuccess?: unknown })?.overallSuccess;
+
+  return { vpPolicies, vcPolicies, overallSuccess: typeof overallSuccess === 'boolean' ? overallSuccess : undefined };
 }
 
 function flattenCredentialClaims(credentialData: unknown): ClaimField[] {
@@ -614,6 +670,92 @@ function renderClaimFields(container: HTMLElement, fields: ClaimField[]): void {
     wrapper.appendChild(value);
     container.appendChild(wrapper);
   });
+}
+
+function renderPolicyResults(container: HTMLElement, data: PolicyDisplay | null | undefined): void {
+  container.innerHTML = '';
+  const vpPolicies = data?.vpPolicies ?? [];
+  const vcPolicies = data?.vcPolicies ?? [];
+  const overall = data?.overallSuccess;
+
+  if (!vpPolicies.length && !vcPolicies.length && typeof overall !== 'boolean') {
+    const empty = document.createElement('div');
+    empty.className = 'field muted';
+    empty.textContent = 'No policy results';
+    container.appendChild(empty);
+    return;
+  }
+
+  const buildGroup = (title: string, items: PolicyResult[]) => {
+    if (!items.length) return;
+    const group = document.createElement('div');
+    group.className = 'policy-group';
+
+    const heading = document.createElement('div');
+    heading.className = 'policy-heading';
+    heading.textContent = title;
+
+    const list = document.createElement('div');
+    list.className = 'policy-list';
+
+    items.forEach((policy) => {
+      const item = document.createElement('div');
+      item.className = 'policy-item';
+
+      const dot = document.createElement('span');
+      dot.className = `status-dot ${policy.success ? 'success' : 'fail'}`;
+      dot.setAttribute('aria-label', policy.success ? 'Pass' : 'Fail');
+      dot.setAttribute('role', 'img');
+
+      const textWrap = document.createElement('div');
+      textWrap.className = 'policy-text';
+
+      const name = document.createElement('span');
+      name.className = 'policy-name';
+      name.textContent = policy.name;
+
+      textWrap.appendChild(name);
+
+      if (policy.credential) {
+        const meta = document.createElement('span');
+        meta.className = 'policy-meta';
+        meta.textContent = `Credential: ${policy.credential}`;
+        textWrap.appendChild(meta);
+      }
+
+      item.appendChild(dot);
+      item.appendChild(textWrap);
+      list.appendChild(item);
+    });
+
+    group.appendChild(heading);
+    group.appendChild(list);
+    container.appendChild(group);
+  };
+
+  buildGroup('VP Policies', vpPolicies);
+  buildGroup('VC Policies', vcPolicies);
+
+  if (typeof overall === 'boolean') {
+    const overallRow = document.createElement('div');
+    overallRow.className = 'policy-item overall';
+
+    const dot = document.createElement('span');
+    dot.className = `status-dot ${overall ? 'success' : 'fail'}`;
+    dot.setAttribute('aria-label', overall ? 'Overall success' : 'Overall failure');
+    dot.setAttribute('role', 'img');
+
+    const text = document.createElement('div');
+    text.className = 'policy-text';
+    const name = document.createElement('span');
+    name.className = 'policy-name';
+    name.textContent = 'Overall Result';
+    text.appendChild(name);
+
+    overallRow.appendChild(dot);
+    overallRow.appendChild(text);
+    container.appendChild(overallRow);
+  }
 }
 
 function formatClaimValue(value: unknown): string {

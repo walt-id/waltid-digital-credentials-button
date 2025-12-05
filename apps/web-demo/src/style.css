@@ -267,6 +267,77 @@ digital-credentials-button::part(button)::before {
   gap: 10px;
 }
 
+.policy-section {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+}
+
+.policy-group {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.policy-heading {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: #0f172a;
+}
+
+.policy-list {
+  display: grid;
+  gap: 8px;
+}
+
+.policy-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.policy-item.overall {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed #e2e8f0;
+  background: #f8fafc;
+}
+
+.policy-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.policy-name {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.policy-meta {
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.status-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.08);
+}
+
+.status-dot.success {
+  background: #10b981;
+}
+
+.status-dot.fail {
+  background: #ef4444;
+}
+
 .field {
   display: flex;
   flex-direction: column;
