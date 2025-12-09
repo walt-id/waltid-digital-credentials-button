@@ -80,6 +80,7 @@ section.card {
   gap: 10px;
   border: 1px solid #0b1322;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  overflow-x: auto;
 }
 
 .log-entry {
@@ -106,6 +107,11 @@ section.card {
   background: transparent;
   color: inherit;
   font-size: 0.9rem;
+}
+
+.log-output pre {
+  overflow-x: auto;
+  white-space: pre;
 }
 
 .log-empty {
