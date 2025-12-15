@@ -8,6 +8,11 @@ Tiny Vite middleware that stands in for a backend during development. It exposes
 - `POST /api/dc/request/:requestId` — same as above but uses the provided JSON body as the config instead of `config/*-conf.json`.
 - `POST /api/dc/response` — looks up the last `sessionId` for the given `request-id`, forwards the payload to `/verification-session/{sessionId}/response`, then polls `/verification-session/{sessionId}/info` and returns that result.
 
+It also supports ISO/IEC 18013-7 Annex C (mdoc) via:
+- `GET /api/dc/annex-c/request/:requestId` — creates an Annex C session via `${VERIFIER_BASE}/annex-c/create` and returns the DC API request from `${VERIFIER_BASE}/annex-c/request`.
+- `POST /api/dc/annex-c/request/:requestId` — same as above but uses the provided JSON body as the config instead of `config/*-conf.json`.
+- `POST /api/dc/annex-c/response` — extracts the wallet `EncryptedResponse` (expects `credential.data.response`), forwards it to `${VERIFIER_BASE}/annex-c/response`, then polls `${VERIFIER_BASE}/annex-c/info`.
+
 Defaults:
 - `VERIFIER_BASE` env (or `verifierBase` option) sets the verifier base URL. Fallback: `https://verifier2.portal.test.waltid.cloud`.
 - Configs live in `config/*-conf.json` (e.g., `unsigned-mdl-conf.json`). Add your own to support new `request-id`s.

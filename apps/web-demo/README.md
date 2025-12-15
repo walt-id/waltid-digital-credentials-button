@@ -12,4 +12,8 @@ Vite demo for `<digital-credentials-button>` backed by the in-repo demo backend 
 - Run: `docker run --rm -p 8080:80 waltid/digital-credentials`
 - Optional: `VERIFIER_BASE=https://verifier.example.com` to point the demo backend at a different verifier.
 
-Endpoints `/api/dc/request` and `/api/dc/response` are served by the demo backend middleware. Use a browser with Digital Credentials API support.
+The demo supports two retrieval protocols:
+- OpenID4VP (dc_api): `/api/dc/request` + `/api/dc/response`
+- ISO 18013-7 Annex C (org.iso.mdoc): `/api/dc/annex-c/request` + `/api/dc/annex-c/response`
+
+Use a browser with Digital Credentials API support.

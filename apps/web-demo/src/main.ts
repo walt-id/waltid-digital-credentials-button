@@ -6,11 +6,16 @@ import 'highlight.js/styles/github-dark.css';
 
 const REQUEST_LIST_ENDPOINT = '/api/dc/requests';
 const REQUEST_ENDPOINT = '/api/dc/request';
+const ANNEX_C_REQUEST_ENDPOINT = '/api/dc/annex-c/request';
 const REQUEST_CONFIG_ENDPOINT = '/api/dc/request-config';
 const RESPONSE_ENDPOINT = '/api/dc/response';
+const ANNEX_C_RESPONSE_ENDPOINT = '/api/dc/annex-c/response';
 const DEFAULT_REQUEST_ID = 'unsigned-mdl';
 const SIGNED_REQUEST_KEY = 'dc-signed-request';
 const ENCRYPTED_RESPONSE_KEY = 'dc-encrypted-response';
+const RETRIEVAL_PROTOCOL_KEY = 'dc-retrieval-protocol';
+
+type RetrievalProtocol = 'openid4vp' | 'annex-c';
 
 type ClaimField = {
   key: string;
@@ -52,6 +57,7 @@ async function init(): Promise<void> {
   const logEntries: LogEntry[] = [];
   const logEl = document.getElementById('log');
   const dcButton = document.getElementById('demo-btn') as HTMLElement | null;
+  const protocolSelect = document.getElementById('protocol-select') as HTMLSelectElement | null;
   const requestSelect = document.getElementById('request-select') as HTMLSelectElement | null;
   const clearLogBtn = document.getElementById('clear-log') as HTMLButtonElement | null;
   const customizeBtn = document.getElementById('customize-request') as HTMLButtonElement | null;
@@ -72,14 +78,20 @@ async function init(): Promise<void> {
 
   const urlState = new URL(window.location.href);
   let requestId = urlState.searchParams.get('request-id') || DEFAULT_REQUEST_ID;
+  let retrievalProtocol = resolveRetrievalProtocol(
+    urlState.searchParams.get('retrieval-protocol') || getRetrievalProtocolStored()
+  );
   let customPayload: unknown = readCustomPayload(requestId);
   let signedEnabled = getSignedEnabled();
   let encryptedEnabled = getEncryptedEnabled();
   let payloadSyncToken = 0;
   const fallbackRequestIds = getRequestIdsFromSelect();
 
+  syncRetrievalProtocolToUrl(retrievalProtocol);
   await loadRequestOptions(fallbackRequestIds);
   primeButton();
+  syncProtocolSelect();
+  updateProtocolToggles();
   renderLog();
   wireEvents();
   await refreshRequestPayload();
@@ -112,6 +124,20 @@ async function init(): Promise<void> {
       dcButton.addEventListener('credential-error', (event) =>
         logJson('Flow error', (event as CustomEvent).detail)
       );
+    }
+
+    if (protocolSelect) {
+      protocolSelect.addEventListener('change', () => {
+        retrievalProtocol = resolveRetrievalProtocol(protocolSelect.value);
+        setRetrievalProtocolStored(retrievalProtocol);
+        syncRetrievalProtocolToUrl(retrievalProtocol);
+        syncProtocolSelect();
+        updateProtocolToggles();
+        customPayload = readCustomPayload(requestId);
+        void refreshRequestPayload();
+        primeButton();
+        logLine(`retrieval protocol set to ${retrievalProtocol}`);
+      });
     }
 
     if (requestSelect) {
@@ -263,12 +289,14 @@ async function init(): Promise<void> {
 
     console.log('Refreshing request payload...');
     console.log('- requestId:', requestId);
+    console.log('- retrievalProtocol:', retrievalProtocol);
     console.log('- signedEnabled:', signedEnabled);
     console.log('- encryptedEnabled:', encryptedEnabled);
     console.log('- customPayload:', customPayload);
     console.log(dcButton.getAttribute('request-payload'));
 
     const activeRequestId = requestId;
+    const activeProtocol = retrievalProtocol;
     const activeSigned = signedEnabled;
     const activeEncrypted = encryptedEnabled;
     const currentSync = ++payloadSyncToken;
@@ -279,6 +307,7 @@ async function init(): Promise<void> {
     const basePayload = storedPayload ?? (await fetchRequestConfig(activeRequestId));
     if (
       activeRequestId !== requestId ||
+      activeProtocol !== retrievalProtocol ||
       activeSigned !== signedEnabled ||
       activeEncrypted !== encryptedEnabled ||
       currentSync !== payloadSyncToken
@@ -388,7 +417,7 @@ async function init(): Promise<void> {
     if (customPayload !== undefined && !storedPayload) {
       clearCustomPayload(requestId);
     }
-    customizeSubtitle.textContent = `Request: ${requestId}`;
+    customizeSubtitle.textContent = `Protocol: ${retrievalProtocol} • Request: ${requestId}`;
     customizeTextarea.value = basePayload ? JSON.stringify(basePayload, null, 2) : '';
     customizeModal.hidden = false;
   }
@@ -445,10 +474,11 @@ async function init(): Promise<void> {
   }
 
   function customPayloadKey(id: string): string {
-    return `dc-custom-payload:${id}`;
+    return `dc-custom-payload:${retrievalProtocol}:${id}`;
   }
 
   function applySigningOptions(payload: unknown, signed: boolean, encrypted: boolean): unknown {
+    if (retrievalProtocol !== 'openid4vp') return payload;
     const clone = cloneJson(payload);
     if (!clone || typeof clone !== 'object') return payload;
     const core = (clone as { core?: unknown }).core;
@@ -478,9 +508,61 @@ async function init(): Promise<void> {
 
   function primeButton(): void {
     if (!dcButton) return;
+    const endpoints = getDcApiEndpoints(retrievalProtocol);
     dcButton.setAttribute('request-id', requestId);
-    dcButton.setAttribute('request-endpoint', REQUEST_ENDPOINT);
-    dcButton.setAttribute('response-endpoint', RESPONSE_ENDPOINT);
+    dcButton.setAttribute('request-endpoint', endpoints.requestEndpoint);
+    dcButton.setAttribute('response-endpoint', endpoints.responseEndpoint);
+  }
+
+  function getDcApiEndpoints(protocol: RetrievalProtocol): {
+    requestEndpoint: string;
+    responseEndpoint: string;
+  } {
+    if (protocol === 'annex-c') {
+      return { requestEndpoint: ANNEX_C_REQUEST_ENDPOINT, responseEndpoint: ANNEX_C_RESPONSE_ENDPOINT };
+    }
+    return { requestEndpoint: REQUEST_ENDPOINT, responseEndpoint: RESPONSE_ENDPOINT };
+  }
+
+  function resolveRetrievalProtocol(input: string | null): RetrievalProtocol {
+    const normalized = (input || '').trim().toLowerCase();
+    if (normalized === 'annex-c' || normalized === 'annexc') return 'annex-c';
+    if (normalized === 'openid4vp' || normalized === 'oid4vp') return 'openid4vp';
+    return 'openid4vp';
+  }
+
+  function syncProtocolSelect(): void {
+    if (!protocolSelect) return;
+    protocolSelect.value = retrievalProtocol;
+  }
+
+  function updateProtocolToggles(): void {
+    const enabled = retrievalProtocol === 'openid4vp';
+    if (signedToggle) signedToggle.disabled = !enabled;
+    if (encryptedToggle) encryptedToggle.disabled = !enabled;
+  }
+
+  function syncRetrievalProtocolToUrl(next: RetrievalProtocol): void {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('retrieval-protocol', next);
+    window.history.replaceState({}, '', nextUrl.toString());
+  }
+
+  function getRetrievalProtocolStored(): RetrievalProtocol {
+    try {
+      return resolveRetrievalProtocol(localStorage.getItem(RETRIEVAL_PROTOCOL_KEY));
+    } catch (error) {
+      console.error(`Failed to read ${RETRIEVAL_PROTOCOL_KEY} from localStorage`, error);
+      return 'openid4vp';
+    }
+  }
+
+  function setRetrievalProtocolStored(next: RetrievalProtocol): void {
+    try {
+      localStorage.setItem(RETRIEVAL_PROTOCOL_KEY, next);
+    } catch (error) {
+      console.error(`Failed to store ${RETRIEVAL_PROTOCOL_KEY} in localStorage`, error);
+    }
   }
 
   function getSignedEnabled(): boolean {
