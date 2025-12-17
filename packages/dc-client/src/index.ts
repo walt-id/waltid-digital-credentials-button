@@ -200,7 +200,21 @@ async function invokeDigitalCredentialsApi(requestPayload: unknown): Promise<unk
 
   try {
     console.info('[dc-client] invoking navigator.credentials.get');
-    const result = await nav.credentials.get(requestPayload as any);
+
+    // Wrapped payload to match DC API expected structure if needed
+    const dcApiRequestPayload =
+      requestPayload != null &&
+      typeof requestPayload === 'object' &&
+      Object.prototype.hasOwnProperty.call(requestPayload, 'digital')
+        ? requestPayload
+        : {
+            digital: {
+              requests: [requestPayload]
+            }
+          };
+
+    console.debug('[dc-client] dc-api request payload', dcApiRequestPayload);
+    const result = await nav.credentials.get(dcApiRequestPayload as any);
     if (result == null) {
       throw new CredentialFlowError('dc-api', 'Digital Credentials API returned empty response.');
     }
