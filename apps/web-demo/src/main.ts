@@ -305,6 +305,12 @@ async function init(): Promise<void> {
       clearCustomPayload(activeRequestId);
     }
     const basePayload = storedPayload ?? (await fetchRequestConfig(activeRequestId));
+    console.log('[dc-web-demo] base request payload', {
+      requestId: activeRequestId,
+      protocol: activeProtocol,
+      hasCustomPayload: !!storedPayload,
+      summary: summarizePayload(basePayload)
+    });
     if (
       activeRequestId !== requestId ||
       activeProtocol !== retrievalProtocol ||
@@ -320,8 +326,19 @@ async function init(): Promise<void> {
       return;
     }
 
-    const patched = applySigningOptions(basePayload, activeSigned, activeEncrypted);
+    const patched =
+      activeProtocol === 'annex-c'
+        ? toAnnexCConfig(basePayload)
+        : applySigningOptions(basePayload, activeSigned, activeEncrypted);
+    if (activeProtocol === 'annex-c') {
+      console.log('[dc-web-demo] annex-c payload derived', {
+        requestId: activeRequestId,
+        payload: patched,
+        summary: summarizePayload(patched)
+      });
+    }
     if (!patched || typeof patched !== 'object') {
+      console.warn('[dc-web-demo] unable to derive request payload; clearing request-payload attribute');
       dcButton.removeAttribute('request-payload');
       dcButton.removeAttribute('data-has-custom-payload');
       return;
@@ -332,6 +349,10 @@ async function init(): Promise<void> {
     try {
       dcButton.setAttribute('request-payload', JSON.stringify(patched));
       dcButton.setAttribute('data-has-custom-payload', 'true');
+      console.log('[dc-web-demo] request-payload attribute updated', {
+        requestId: activeRequestId,
+        protocol: activeProtocol
+      });
     } catch (error) {
       console.error('Failed to serialize request payload', error);
       dcButton.removeAttribute('request-payload');
@@ -489,6 +510,76 @@ async function init(): Promise<void> {
     return clone;
   }
 
+  function toAnnexCConfig(payload: unknown): Record<string, unknown> | null {
+    if (!payload || typeof payload !== 'object') return null;
+    const obj = payload as Record<string, unknown>;
+    if (typeof obj.docType === 'string' && obj.requestedElements && typeof obj.requestedElements === 'object') {
+      const policies = isPolicyObject(obj.policies) ? obj.policies : undefined;
+      const ttlSeconds = typeof obj.ttlSeconds === 'number' ? obj.ttlSeconds : undefined;
+      return {
+        flow_type: 'dc_api-annex-c',
+        docType: obj.docType,
+        requestedElements: obj.requestedElements,
+        ...(policies ? { policies } : {}),
+        ...(ttlSeconds ? { ttlSeconds } : {})
+      };
+    }
+
+    const core = obj.core && typeof obj.core === 'object' ? (obj.core as Record<string, unknown>) : null;
+    const dcqlCandidate = core ? (core.dcql_query ?? core.dcqlQuery) : undefined;
+    const dcql = dcqlCandidate && typeof dcqlCandidate === 'object' ? (dcqlCandidate as any) : null;
+    const credentials = dcql && Array.isArray(dcql.credentials) ? (dcql.credentials as unknown[]) : [];
+    const firstCred = credentials.find((entry) => entry && typeof entry === 'object') as any;
+    if (!firstCred) return null;
+
+    const meta = firstCred?.meta && typeof firstCred.meta === 'object' ? (firstCred.meta as any) : null;
+    const docType = meta ? meta.doctype_value ?? meta.doctypeValue ?? meta.docType : undefined;
+    if (!docType || typeof docType !== 'string') return null;
+
+    const requestedElements: Record<string, string[]> = {};
+    const claims = Array.isArray(firstCred?.claims)
+      ? firstCred.claims
+      : Array.isArray(firstCred?.claims_query)
+        ? firstCred.claims_query
+        : [];
+    for (const claim of claims) {
+      const path = (claim as any)?.path ?? (claim as any)?.claim_path;
+      let namespace = '';
+      let element = '';
+      if (Array.isArray(path) && path.length >= 2) {
+        namespace = String(path[0] ?? '').trim();
+        element = String(path[1] ?? '').trim();
+      } else if (typeof path === 'string') {
+        const parts = path.split('.').map((part: string) => part.trim()).filter(Boolean);
+        if (parts.length >= 2) {
+          namespace = parts[0] ?? '';
+          element = parts[1] ?? '';
+        }
+      }
+      if (!namespace || !element) continue;
+      requestedElements[namespace] ??= [];
+      if (!requestedElements[namespace].includes(element)) requestedElements[namespace].push(element);
+    }
+    if (!Object.keys(requestedElements).length) return null;
+
+    const policies = isPolicyObject(obj.policies)
+      ? obj.policies
+      : isPolicyObject(core?.policies)
+        ? core?.policies
+        : undefined;
+
+    return {
+      flow_type: 'dc_api-annex-c',
+      docType,
+      requestedElements,
+      ...(policies ? { policies } : {})
+    };
+  }
+
+  function isPolicyObject(value: unknown): value is Record<string, unknown> {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+
   function cloneJson<T>(value: T): T | null {
     try {
       return JSON.parse(JSON.stringify(value)) as T;
@@ -496,6 +587,30 @@ async function init(): Promise<void> {
       console.error('Failed to clone JSON payload', error);
       return null;
     }
+  }
+
+  function summarizePayload(payload: unknown): Record<string, unknown> {
+    if (!payload || typeof payload !== 'object') return { type: typeof payload };
+    const obj = payload as Record<string, unknown>;
+    if (typeof obj.flow_type === 'string') {
+      return { flow_type: obj.flow_type };
+    }
+    if (typeof obj.docType === 'string' && obj.requestedElements && typeof obj.requestedElements === 'object') {
+      const requested = obj.requestedElements as Record<string, unknown>;
+      return {
+        flow_type: 'dc_api-annex-c',
+        docType: obj.docType,
+        namespaces: Object.keys(requested).length
+      };
+    }
+    const core = obj.core && typeof obj.core === 'object' ? (obj.core as Record<string, unknown>) : null;
+    const dcqlCandidate = core ? (core.dcql_query ?? core.dcqlQuery) : undefined;
+    const dcql = dcqlCandidate && typeof dcqlCandidate === 'object' ? (dcqlCandidate as any) : null;
+    const credentials = dcql && Array.isArray(dcql.credentials) ? (dcql.credentials as unknown[]) : [];
+    const firstCred = credentials.find((entry) => entry && typeof entry === 'object') as any;
+    const meta = firstCred?.meta && typeof firstCred.meta === 'object' ? (firstCred.meta as any) : null;
+    const docType = meta ? meta.doctype_value ?? meta.doctypeValue ?? meta.docType : undefined;
+    return { flow_type: obj.flow_type, docType };
   }
 
   function isVerifierConfigPayload(input: unknown): input is Record<string, unknown> {

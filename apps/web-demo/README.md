@@ -14,6 +14,6 @@ Vite demo for `<digital-credentials-button>` backed by the in-repo demo backend 
 
 The demo supports two retrieval protocols:
 - OpenID4VP (dc_api): `/api/dc/request` + `/api/dc/response`
-- ISO 18013-7 Annex C (org.iso.mdoc): `/api/dc/annex-c/request` + `/api/dc/annex-c/response`
+- ISO 18013-7 Annex C (org.iso.mdoc): `/api/dc/annex-c/request` + `/api/dc/annex-c/response` (backed by verifier `/verification-session/*` with `flow_type: "dc_api-annex-c"`)
 
 Use a browser with Digital Credentials API support.

@@ -38,6 +38,13 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
   const verifierBase = options.verifierBase ?? process.env.VERIFIER_BASE ?? DEFAULT_VERIFIER_BASE;
   const logger = options.logger ?? console;
   const sessions = new Map<string, string>();
+  const log = (message: string, payload?: unknown) => {
+    if (payload === undefined) {
+      logger.info?.(message);
+      return;
+    }
+    logger.info?.(`${message} ${safeJson(payload)}`);
+  };
 
   const sessionKey = (protocol: SessionProtocol, requestId: string) => `${protocol}:${requestId}`;
   const getLatestSessionId = (protocol: SessionProtocol): string | undefined =>
@@ -60,6 +67,11 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
         const pathname = normalizePath(url.pathname);
 
         try {
+          log('[dc-demo-backend] incoming request', {
+            method: req.method,
+            path: pathname,
+            query: Object.fromEntries(url.searchParams.entries())
+          });
           if (req.method === 'GET' && pathname === REQUEST_LIST_PATH) {
             const requestIds = await listRequestIds();
             return sendJson(res, requestIds);
@@ -76,7 +88,7 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
             const requestId = getRequestId(url, pathname);
             const sessionId = await createSession(requestId, verifierBase);
             setSessionId('openid4vp', requestId, sessionId);
-            logger.info?.(`[dc-demo-backend] session ${sessionId} created for ${requestId}`);
+            log('[dc-demo-backend] session created', { requestId, sessionId, protocol: 'openid4vp' });
 
             const payload = await fetchRequestPayload(sessionId, verifierBase);
             return sendJson(res, payload);
@@ -90,9 +102,11 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
             }
             const sessionId = await createSession(requestId, verifierBase, overrideConfig);
             setSessionId('openid4vp', requestId, sessionId);
-            logger.info?.(
-              `[dc-demo-backend] session ${sessionId} created for ${requestId} (custom config)`
-            );
+            log('[dc-demo-backend] session created (custom config)', {
+              requestId,
+              sessionId,
+              protocol: 'openid4vp'
+            });
             const payload = await fetchRequestPayload(sessionId, verifierBase);
             return sendJson(res, payload);
           }
@@ -105,7 +119,11 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
             }
             const body = await readJsonBody(req);
             const verification = await postCredentialResponse(sessionId, body, verifierBase);
-            logger.info?.(`[dc-demo-backend] verification returned for ${requestId} (session ${sessionId})`);
+            log('[dc-demo-backend] verification returned', {
+              requestId,
+              sessionId,
+              protocol: 'openid4vp'
+            });
             return sendJson(res, verification);
           }
 
@@ -114,7 +132,11 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
             const origin = getRequestOrigin(req);
             const sessionId = await createAnnexCSession(requestId, verifierBase, origin);
             setSessionId('annex-c', requestId, sessionId);
-            logger.info?.(`[dc-demo-backend] annex-c session ${sessionId} created for ${requestId}`);
+            log('[dc-demo-backend] annex-c session created', {
+              requestId,
+              sessionId,
+              origin
+            });
             const payload = await fetchAnnexCRequestPayload(sessionId, verifierBase);
             return sendJson(res, payload);
           }
@@ -126,9 +148,18 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
             if (!overrideConfig || typeof overrideConfig !== 'object') {
               throw new HttpError(400, 'Request payload is required to create a session.');
             }
+            log('[dc-demo-backend] annex-c override config', {
+              requestId,
+              origin,
+              keys: Object.keys(overrideConfig)
+            });
             const sessionId = await createAnnexCSession(requestId, verifierBase, origin, overrideConfig);
             setSessionId('annex-c', requestId, sessionId);
-            logger.info?.(`[dc-demo-backend] annex-c session ${sessionId} created for ${requestId} (custom config)`);
+            log('[dc-demo-backend] annex-c session created (custom config)', {
+              requestId,
+              sessionId,
+              origin
+            });
             const payload = await fetchAnnexCRequestPayload(sessionId, verifierBase);
             return sendJson(res, payload);
           }
@@ -141,9 +172,10 @@ export function dcDemoBackend(options: DcDemoBackendOptions = {}): Plugin {
             }
             const body = await readJsonBody(req);
             const verification = await postAnnexCResponse(sessionId, body, verifierBase);
-            logger.info?.(
-              `[dc-demo-backend] annex-c verification returned for ${requestId} (session ${sessionId})`
-            );
+            log('[dc-demo-backend] annex-c verification returned', {
+              requestId,
+              sessionId
+            });
             return sendJson(res, verification);
           }
         } catch (error) {
@@ -207,10 +239,12 @@ async function createSession(
 }
 
 type AnnexCCreateRequest = {
+  flow_type: 'dc_api-annex-c';
   docType: string;
   requestedElements: Record<string, string[]>;
-  policies?: string[];
+  policies?: Record<string, unknown>;
   origin: string;
+  ttlSeconds?: number;
 };
 
 async function createAnnexCSession(
@@ -221,7 +255,8 @@ async function createAnnexCSession(
 ): Promise<string> {
   const config = overrideConfig ?? (await readConfig(requestId));
   const createPayload = toAnnexCCreateRequest(config, origin);
-  const response = await fetch(`${verifierBase}/annex-c/create`, {
+  console.info('[dc-demo-backend] annex-c create payload', summarizeAnnexCPayload(createPayload));
+  const response = await fetch(`${verifierBase}/verification-session/create`, {
     method: 'POST',
     headers: {
       accept: 'application/json',
@@ -257,13 +292,13 @@ async function fetchRequestPayload(sessionId: string, verifierBase: string): Pro
 }
 
 async function fetchAnnexCRequestPayload(sessionId: string, verifierBase: string): Promise<unknown> {
-  const response = await fetch(`${verifierBase}/annex-c/request`, {
-    method: 'POST',
+  const url = new URL(`${verifierBase}/verification-session/${sessionId}/request`);
+  url.searchParams.set('intentToRetain', 'false');
+  const response = await fetch(url.toString(), {
+    method: 'GET',
     headers: {
-      accept: 'application/json',
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify({ sessionId, intentToRetain: false })
+      accept: 'application/json'
+    }
   });
 
   if (!response.ok) {
@@ -295,10 +330,10 @@ async function postCredentialResponse(
 
 async function postAnnexCResponse(sessionId: string, payload: unknown, verifierBase: string): Promise<unknown> {
   const responseB64 = extractAnnexCResponseB64(payload);
-  const response = await fetch(`${verifierBase}/annex-c/response`, {
+  const response = await fetch(`${verifierBase}/verification-session/${sessionId}/response`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ sessionId, response: responseB64 })
+    body: JSON.stringify({ response: responseB64 })
   });
 
   if (!response.ok) {
@@ -328,7 +363,7 @@ async function pollAnnexCInfo(sessionId: string, verifierBase: string): Promise<
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (attempt > 0) await sleep(500);
-    last = await getAnnexCInfo(sessionId, verifierBase);
+    last = await getInfo(sessionId, verifierBase);
     if (!isAnnexCProcessing(last)) return last;
   }
 
@@ -344,25 +379,6 @@ async function getInfo(sessionId: string, verifierBase: string): Promise<unknown
   if (!response.ok) {
     const text = await response.text();
     throw new HttpError(response.status || 500, text || 'Failed to fetch verification info');
-  }
-
-  if (response.headers.get('content-type')?.includes('application/json')) {
-    return await response.json();
-  }
-  return await response.text();
-}
-
-async function getAnnexCInfo(sessionId: string, verifierBase: string): Promise<unknown> {
-  const url = new URL(`${verifierBase}/annex-c/info`);
-  url.searchParams.set('sessionId', sessionId);
-  const response = await fetch(url.toString(), {
-    method: 'GET',
-    headers: { accept: 'application/json' }
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new HttpError(response.status || 500, text || 'Failed to fetch Annex C info');
   }
 
   if (response.headers.get('content-type')?.includes('application/json')) {
@@ -476,65 +492,85 @@ function extractCredentialPayload(payload: unknown): unknown {
 function toAnnexCCreateRequest(input: unknown, origin: string): AnnexCCreateRequest {
   if (isAnnexCCreateRequest(input)) {
     const obj = input as Record<string, unknown>;
-    const providedPolicies = Array.isArray(obj.policies) ? (obj.policies as unknown[]) : undefined;
-    const policies = providedPolicies
-      ? providedPolicies
-          .filter((value): value is string => typeof value === 'string')
-          .map((value) => value.trim())
-          .filter(Boolean)
-      : ['mdoc-device-auth', 'mdoc-issuer-auth'];
-
+    const policies = isPolicyObject(obj.policies) ? obj.policies : undefined;
     const ttlSeconds = typeof obj.ttlSeconds === 'number' ? obj.ttlSeconds : undefined;
     return {
+      flow_type: 'dc_api-annex-c',
       docType: String(obj.docType),
       requestedElements: obj.requestedElements as Record<string, string[]>,
-      policies,
       origin,
+      ...(policies ? { policies } : {}),
       ...(ttlSeconds ? { ttlSeconds } : {})
     };
   }
 
   const legacy = input && typeof input === 'object' ? (input as Record<string, unknown>) : null;
   const core = legacy && legacy.core && typeof legacy.core === 'object' ? (legacy.core as Record<string, unknown>) : null;
-  const dcql = core && core.dcql_query && typeof core.dcql_query === 'object' ? (core.dcql_query as any) : null;
+  const dcqlCandidate =
+    core && typeof core === 'object'
+      ? ((core.dcql_query ?? core.dcqlQuery) as Record<string, unknown> | undefined)
+      : undefined;
+  const dcql = dcqlCandidate && typeof dcqlCandidate === 'object' ? (dcqlCandidate as any) : null;
   const credentials = dcql && Array.isArray(dcql.credentials) ? (dcql.credentials as unknown[]) : [];
   const firstCred = credentials.find((entry) => entry && typeof entry === 'object') as any;
-  const docType =
-    firstCred?.meta && typeof firstCred.meta === 'object' ? (firstCred.meta as any).doctype_value : undefined;
+  const meta = firstCred?.meta && typeof firstCred.meta === 'object' ? (firstCred.meta as any) : null;
+  const docType = meta ? meta.doctype_value ?? meta.doctypeValue ?? meta.docType : undefined;
 
   const requestedElements: Record<string, string[]> = {};
-  const claims = Array.isArray(firstCred?.claims) ? firstCred.claims : [];
+  const claims = Array.isArray(firstCred?.claims)
+    ? firstCred.claims
+    : Array.isArray(firstCred?.claims_query)
+      ? firstCred.claims_query
+      : [];
   for (const claim of claims) {
-    const path = (claim as any)?.path;
-    if (!Array.isArray(path) || path.length < 2) continue;
-    const namespace = String(path[0] ?? '').trim();
-    const element = String(path[1] ?? '').trim();
+    const path = (claim as any)?.path ?? (claim as any)?.claim_path;
+    let namespace = '';
+    let element = '';
+    if (Array.isArray(path) && path.length >= 2) {
+      namespace = String(path[0] ?? '').trim();
+      element = String(path[1] ?? '').trim();
+    } else if (typeof path === 'string') {
+      const parts = path.split('.').map((part: string) => part.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        namespace = parts[0] ?? '';
+        element = parts[1] ?? '';
+      }
+    }
     if (!namespace || !element) continue;
     requestedElements[namespace] ??= [];
     if (!requestedElements[namespace].includes(element)) requestedElements[namespace].push(element);
   }
 
   if (!docType || typeof docType !== 'string') {
-    throw new HttpError(400, 'Annex C create requires a docType (expected core.dcql_query.credentials[0].meta.doctype_value).');
+    throw new HttpError(
+      400,
+      'Annex C create requires a docType (expected core.dcql_query/core.dcqlQuery.credentials[0].meta.doctype_value).'
+    );
   }
   if (!Object.keys(requestedElements).length) {
     throw new HttpError(
       400,
-      'Annex C create requires requestedElements (expected core.dcql_query.credentials[0].claims[].path).'
+      'Annex C create requires requestedElements (expected core.dcql_query/core.dcqlQuery.credentials[0].claims[].path).'
     );
   }
 
   const policies = Array.isArray(legacy?.policies)
-    ? (legacy?.policies as unknown[])
-    : Array.isArray(core?.policies)
-      ? (core?.policies as unknown[])
-      : undefined;
+    ? undefined
+    : isPolicyObject(legacy?.policies)
+      ? legacy?.policies
+      : isPolicyObject(core?.policies)
+        ? core?.policies
+        : undefined;
+  const ttlSeconds = typeof legacy?.ttlSeconds === 'number' ? (legacy?.ttlSeconds as number) : undefined;
 
-  const normalizedPolicies = policies
-    ? policies.filter((value): value is string => typeof value === 'string').map((value) => value.trim()).filter(Boolean)
-    : ['mdoc-device-auth', 'mdoc-issuer-auth'];
-
-  return { docType, requestedElements, policies: normalizedPolicies, origin };
+  return {
+    flow_type: 'dc_api-annex-c',
+    docType,
+    requestedElements,
+    origin,
+    ...(policies ? { policies } : {}),
+    ...(ttlSeconds ? { ttlSeconds } : {})
+  };
 }
 
 function isAnnexCCreateRequest(input: unknown): input is AnnexCCreateRequest {
@@ -543,6 +579,10 @@ function isAnnexCCreateRequest(input: unknown): input is AnnexCCreateRequest {
   if (typeof obj.docType !== 'string') return false;
   if (!obj.requestedElements || typeof obj.requestedElements !== 'object') return false;
   return true;
+}
+
+function isPolicyObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 function getRequestOrigin(req: IncomingMessage): string {
@@ -571,6 +611,26 @@ function sendError(res: ServerResponse, error: unknown): void {
   res.statusCode = status;
   res.setHeader('content-type', 'application/json');
   res.end(JSON.stringify({ message }));
+}
+
+function summarizeAnnexCPayload(payload: AnnexCCreateRequest): Record<string, unknown> {
+  const requestedNamespaces = Object.keys(payload.requestedElements || {});
+  return {
+    flow_type: payload.flow_type,
+    docType: payload.docType,
+    namespaces: requestedNamespaces.length,
+    origin: payload.origin,
+    ttlSeconds: payload.ttlSeconds ?? null,
+    policyKeys: payload.policies ? Object.keys(payload.policies) : []
+  };
+}
+
+function safeJson(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '"[unserializable]"';
+  }
 }
 
 function sleep(ms: number): Promise<void> {

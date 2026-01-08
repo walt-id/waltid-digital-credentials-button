@@ -48,8 +48,8 @@ All demos talk to `/api/dc/*` endpoints served by the demo backend (Vite plugin)
 ## Endpoints & configs
 - Request endpoint: `/api/dc/request/:requestId` (also accepts `?request-id=`). Uses `packages/dc-backend-demo/config/<id>-conf.json` to create a verifier session and return the DC API payload.
 - Verification endpoint: `/api/dc/response` forwards the credential response to the verifier session and returns verifier info.
-- Annex C request endpoint: `/api/dc/annex-c/request/:requestId` creates an Annex C session and returns the DC API request payload (`org-iso-mdoc`).
-- Annex C verification endpoint: `/api/dc/annex-c/response` forwards the wallet response to the verifier and returns the Annex C session info.
+- Annex C request endpoint: `/api/dc/annex-c/request/:requestId` creates an Annex C session via `/verification-session/create` with `flow_type: "dc_api-annex-c"` and returns the DC API request payload from `/verification-session/{sessionId}/request`.
+- Annex C verification endpoint: `/api/dc/annex-c/response` forwards the wallet response to `/verification-session/{sessionId}/response` and returns the Annex C session info from `/verification-session/{sessionId}/info`.
 - Default verifier base: `https://verifier2.portal.test.waltid.cloud` (override with `VERIFIER_BASE` or `dcDemoBackend({ verifierBase })`).
 - Request IDs are derived from `packages/dc-backend-demo/config/*-conf.json`.
 
