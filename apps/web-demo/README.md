@@ -12,6 +12,8 @@ Vite demo for `<digital-credentials-button>` backed by the in-repo demo backend 
 - Run: `docker run --rm -p 8080:80 waltid/digital-credentials`
 - Optional: `VERIFIER_BASE=https://verifier.example.com` to point the demo backend at a different verifier.
 
+docker build -t waltid/digital-credentials -f apps/web-demo/Dockerfile .
+
 The demo supports two retrieval protocols:
 - OpenID4VP (dc_api): `/api/dc/request` + `/api/dc/response`
 - ISO 18013-7 Annex C (org.iso.mdoc): `/api/dc/annex-c/request` + `/api/dc/annex-c/response` (backed by verifier `/verification-session/*` with `flow_type: "dc_api-annex-c"`)

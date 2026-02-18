@@ -39,12 +39,14 @@ label {
 }
 
 select,
+input,
 textarea,
 button {
   font: inherit;
 }
 
 select,
+input,
 textarea {
   width: 100%;
   box-sizing: border-box;
@@ -59,6 +61,11 @@ textarea {
   font-size: 13px;
   background: #0f172a;
   color: #e2e8f0;
+}
+
+input {
+  background: #fff;
+  color: #0f172a;
 }
 
 .actions {
