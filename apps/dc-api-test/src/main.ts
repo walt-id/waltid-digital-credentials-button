@@ -43,6 +43,7 @@ async function init(): Promise<void> {
   const verifierPresetSelect = document.getElementById('verifier-preset') as HTMLSelectElement | null;
   const bearerTokenInput = document.getElementById('bearer-token') as HTMLInputElement | null;
   const statusEl = document.getElementById('status') as HTMLSpanElement | null;
+  const logEl = document.getElementById('log-field') as HTMLPreElement | null;
 
   if (
     !select ||
@@ -51,7 +52,8 @@ async function init(): Promise<void> {
     !reloadButton ||
     !verifierPresetSelect ||
     !bearerTokenInput ||
-    !statusEl
+    !statusEl ||
+    !logEl
   ) {
     throw new Error('Missing required DOM elements');
   }
@@ -105,13 +107,19 @@ async function init(): Promise<void> {
 
   callButton.addEventListener('click', async () => {
     callButton.disabled = true;
+    clearLog(logEl);
+    appendLog(logEl, 'Starting DC API flow...');
     try {
       const config = getRuntimeConfig(verifierPresetSelect, bearerTokenInput);
-      await runDcApiFlow(payloadInput.value, statusEl, config);
-      setStatus(statusEl, 'Completed. Check console for full logs.');
+      await runDcApiFlow(payloadInput.value, statusEl, logEl, config);
+      setStatus(statusEl, 'Completed successfully.');
     } catch (error) {
       console.error('[dc-api-test] flow failed', error);
-      setStatus(statusEl, `Failed: ${toErrorMessage(error)}`);
+      appendLog(logEl, `Flow failed: ${toErrorMessage(error)}`);
+      if (error instanceof HttpError) {
+        appendPayloadLog(logEl, 'Failure payload', error.body);
+      }
+      setStatus(statusEl, 'Failed. See result log.');
     } finally {
       callButton.disabled = false;
     }
@@ -217,11 +225,13 @@ function populateExampleSelect(select: HTMLSelectElement, examples: ExampleEntry
 async function runDcApiFlow(
   payloadJson: string,
   statusEl: HTMLSpanElement,
+  logEl: HTMLPreElement,
   config: RuntimeConfig
 ): Promise<void> {
   setStatus(statusEl, 'Parsing payload...');
   const createPayload = parseJson(payloadJson, 'payload-input');
   console.log('[dc-api-test] create payload', createPayload);
+  appendPayloadLog(logEl, 'Create payload', createPayload);
 
   setStatus(statusEl, 'Creating verification session...');
   const createResponse = await fetchJson(
@@ -244,6 +254,7 @@ async function runDcApiFlow(
   if (!sessionId) {
     throw new Error('No sessionId returned from create endpoint');
   }
+  appendLog(logEl, `Session created: ${sessionId}`);
 
   sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
   console.log('[dc-api-test] sessionId stored in sessionStorage', {
@@ -272,16 +283,18 @@ async function runDcApiFlow(
     },
     'session.request'
   );
+  appendPayloadLog(logEl, 'DC API request payload', dcApiRequest);
 
   setStatus(statusEl, 'Calling navigator.credentials.get...');
   const dcApiResponse = await invokeDigitalCredentialsApi(dcApiRequest);
+  appendPayloadLog(logEl, 'DC API wallet response', dcApiResponse);
 
   const responseUrl = buildUrl(
     config.verifierBase,
     `/verification-session/${encodeURIComponent(sessionId)}/response`
   );
   setStatus(statusEl, 'Posting wallet response...');
-  await fetchAnyWithFallback(
+  const postResponse = await fetchAnyWithFallback(
     [
       responseUrl,
       buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/response`)
@@ -299,13 +312,19 @@ async function runDcApiFlow(
     },
     'session.response'
   );
+  appendLog(logEl, `Posted wallet response (HTTP ${postResponse.status})`);
 
   setStatus(statusEl, 'Polling verification-session info every 10 seconds...');
-  const finalInfo = await pollInfo(sessionId, config);
+  const finalInfo = await pollInfo(sessionId, config, logEl);
+  appendPayloadLog(logEl, 'Final result payload', finalInfo);
   console.log('[dc-api-test] final verification result', finalInfo);
 }
 
-async function pollInfo(sessionId: string, config: RuntimeConfig): Promise<unknown> {
+async function pollInfo(
+  sessionId: string,
+  config: RuntimeConfig,
+  logEl: HTMLPreElement
+): Promise<unknown> {
   const infoUrl = buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`);
   const fallbackInfoUrls = [
     infoUrl,
@@ -332,8 +351,18 @@ async function pollInfo(sessionId: string, config: RuntimeConfig): Promise<unkno
       `session.info#${attempt}`
     );
 
-    if (isResultAvailable(info)) {
+    const status = getInfoStatus(info);
+    appendLog(logEl, `Poll #${attempt}: status=${status || 'UNKNOWN'}`);
+
+    if (status === 'SUCCESSFUL') {
+      appendLog(logEl, 'Verification status is SUCCESSFUL.');
       return info;
+    }
+
+    if (status !== 'IN_USE') {
+      appendLog(logEl, `Verification failed with status ${status || 'UNKNOWN'}.`);
+      appendPayloadLog(logEl, 'Failure payload', info);
+      throw new Error(`Verification failed with status ${status || 'UNKNOWN'}`);
     }
 
     await sleep(POLL_INTERVAL_MS);
@@ -342,18 +371,11 @@ async function pollInfo(sessionId: string, config: RuntimeConfig): Promise<unkno
   throw new Error(`Result not available after ${MAX_POLL_ATTEMPTS} polling attempts`);
 }
 
-function isResultAvailable(info: unknown): boolean {
-  if (!info || typeof info !== 'object') {
-    return true;
-  }
-
+function getInfoStatus(info: unknown): string | null {
+  if (!info || typeof info !== 'object') return null;
   const status = (info as { status?: unknown }).status;
-  if (typeof status !== 'string') {
-    return true;
-  }
-
-  const normalized = status.toLowerCase();
-  return !['created', 'received', 'pending', 'processing'].includes(normalized);
+  if (typeof status !== 'string') return null;
+  return status.toUpperCase();
 }
 
 async function invokeDigitalCredentialsApi(requestPayload: unknown): Promise<unknown> {
@@ -472,12 +494,14 @@ async function fetchAny(url: string, init: RequestInit, label: string): Promise<
 
 class HttpError extends Error {
   status: number;
+  body: string;
 
   constructor(label: string, status: number, body: string) {
-    const suffix = body ? `: ${body}` : '';
+    const suffix = body ? ': see result log for payload' : '';
     super(`${label} failed (${status})${suffix}`);
     this.name = 'HttpError';
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -502,6 +526,46 @@ function setStatus(el: HTMLElement, text: string): void {
 
 function stringifyJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
+}
+
+function clearLog(logEl: HTMLPreElement): void {
+  logEl.textContent = '';
+}
+
+function appendLog(logEl: HTMLPreElement, message: string): void {
+  const next = logEl.textContent ? `${logEl.textContent}\n\n${message}` : message;
+  logEl.textContent = next;
+}
+
+function appendPayloadLog(logEl: HTMLPreElement, label: string, payload: unknown): void {
+  appendLog(logEl, `${label}:\n${formatPayloadForLog(payload)}`);
+}
+
+function formatPayloadForLog(payload: unknown): string {
+  if (typeof payload === 'string') {
+    const parsed = tryParseJson(payload);
+    if (parsed !== null) return stringifyJson(parsed);
+    return payload;
+  }
+
+  if (payload && typeof payload === 'object') {
+    const raw = (payload as { raw?: unknown }).raw;
+    if (typeof raw === 'string') {
+      const parsed = tryParseJson(raw);
+      if (parsed !== null) return stringifyJson(parsed);
+      return raw;
+    }
+  }
+
+  return stringifyJson(payload);
+}
+
+function tryParseJson(input: string): unknown | null {
+  try {
+    return JSON.parse(input);
+  } catch {
+    return null;
+  }
 }
 
 function sleep(ms: number): Promise<void> {

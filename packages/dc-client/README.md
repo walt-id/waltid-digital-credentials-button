@@ -1,8 +1,11 @@
 ## @waltid/dc-client
 
-Barebones Digital Credentials client for loading a request payload, invoking `navigator.credentials.get`, and posting the verification response.
+Core Digital Credentials flow client for:
+- loading a DC request payload
+- invoking `navigator.credentials.get`
+- posting the wallet response for verification
 
-### API
+## API
 
 ```ts
 import { requestCredential } from '@waltid/dc-client';
@@ -10,19 +13,26 @@ import { requestCredential } from '@waltid/dc-client';
 const result = await requestCredential({
   requestId: 'unsigned-mdl',
   requestEndpoint: '/api/dc/request',
-  responseEndpoint: '/api/dc/response',
-  // requestPayload: { ... } // optional: bypass fetching and use this payload directly
+  responseEndpoint: '/api/dc/response'
 });
 
 console.log(result.request, result.dcResponse, result.verification);
 ```
 
-Options:
-- `requestId` (string, optional; defaults to `request-id` query param or `unsigned-mdl`)
-- `requestPayload` (object, optional; if provided, skips fetching from `request-endpoint`)
-- `requestEndpoint` (default `/api/dc/request`)
-- `responseEndpoint` (default `/api/dc/response`)
-- `headers` (object) – merged into fetch headers
-- `fetchImpl` – custom fetch (for SSR/tests)
+## Options
+- `requestId?: string`
+- `requestPayload?: unknown`
+- `requestEndpoint?: string` (default: `/api/dc/request`)
+- `responseEndpoint?: string` (default: `/api/dc/response`)
+- `headers?: Record<string, string>`
+- `fetchImpl?: typeof fetch`
 
-Errors throw `CredentialFlowError` with `stage: 'request' | 'dc-api' | 'verification' | 'network' | 'unexpected'`.
+## Behavior notes
+- If `requestPayload` is **not** provided, the client does `GET {requestEndpoint}/{requestId}`.
+- If `requestPayload` **is** provided, the client does `POST {requestEndpoint}/{requestId}` with that payload as JSON (custom request config flow).
+- Verification is posted to `responseEndpoint` with `{ credential, requestId }`.
+
+## Errors
+Throws `CredentialFlowError` with:
+- `stage: 'request' | 'dc-api' | 'verification' | 'network' | 'unexpected'`
+- message and optional `cause`
