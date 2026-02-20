@@ -1,6 +1,6 @@
 # @waltid/digital-credentials
 
-A lightweight web component that fetches a Digital Credentials request from your backend, calls `navigator.credentials.get`, and posts the result back for verification. Built on the shared core client (`@waltid/dc-client`) so you can drop it into any framework or plain HTML.
+Web component that runs the Digital Credentials flow and emits lifecycle events.
 
 ## Install
 
@@ -19,81 +19,39 @@ npm install @waltid/digital-credentials
   request-id="unsigned-mdl"
   request-endpoint="/api/dc/request"
   response-endpoint="/api/dc/response"
-  label="Request credentials"
+  label="Request Digital Credentials"
 ></digital-credentials-button>
 ```
 
 ## Attributes / properties
+- `request-id` (default: `?request-id` or `unsigned-mdl`)
+- `request-payload` (optional JSON/object custom config)
+- `request-endpoint` (default: `/api/dc/request`)
+- `response-endpoint` (default: `/api/dc/response`)
+- `label` (default: `Request Digital Credentials`)
+- `disabled`
 
-- `request-id` (string, default: from `?request-id` in the URL or `unsigned-mdl`): Which request to load (also forwarded as `request-id` query param).
-- `request-payload` (object/JSON string, optional): If provided, the component skips fetching from `request-endpoint` and uses this payload directly.
-- `request-endpoint` (string, default: `/api/dc/request`): Base URL for fetching the DC API request payload. Component calls `${request-endpoint}/${request-id}` when no `request-payload` is set.
-- `response-endpoint` (string, default: `/api/dc/response`): URL to POST the DC API response for verification.
-- `label` (string, default: `Request credentials`): Button text.
-- `disabled` (boolean attribute): Manually disable interaction.
+Attributes are reflected as properties (`requestId`, `requestPayload`, `requestEndpoint`, `responseEndpoint`, `label`, `disabled`).
 
-All attributes are reflected as properties (`requestId`, `requestPayload`, `requestEndpoint`, `responseEndpoint`, `label`, `disabled`).
-
-To bypass fetching from your backend, set a payload directly:
-
-```html
-<digital-credentials-button
-  request-payload='{"publicKey":"..."}'
-  response-endpoint="/api/dc/response"
-></digital-credentials-button>
-```
+## Important request-payload behavior
+When `request-payload` is provided, the component delegates to `@waltid/dc-client`, which POSTs that payload to `request-endpoint/{request-id}` (custom backend-config mode). It does not bypass the backend request step entirely.
 
 ## Events
+- `credential-request-started`
+- `credential-request-loaded`
+- `credential-dcapi-success`
+- `credential-dcapi-error`
+- `credential-verification-success`
+- `credential-verification-error`
+- `credential-error`
+- `credential-finished`
 
-Lifecycle events bubble and are composed, so you can listen on ancestors:
-
-- `credential-request-started` — `{ requestId }`
-- `credential-request-loaded` — `{ requestId, payload }`
-- `credential-dcapi-success` — `{ requestId, response }`
-- `credential-dcapi-error` — `{ requestId, error }`
-- `credential-verification-success` — `{ requestId, response }`
-- `credential-verification-error` — `{ requestId, error }`
-- `credential-error` — `{ stage, error, requestId }` (any failure)
-- `credential-finished` — `{ requestId, result? , error? }` (always fired last)
-
-Example:
-
-```js
-const el = document.querySelector('digital-credentials-button');
-el.addEventListener('credential-request-loaded', (e) =>
-  console.log('DC request', e.detail.payload)
-);
-el.addEventListener('credential-verification-success', (e) =>
-  console.log('Verified', e.detail.response)
-);
-el.addEventListener('credential-error', (e) =>
-  console.error('Error', e.detail)
-);
-```
+All events bubble and are composed.
 
 ## Styling
+Target component parts:
+- `::part(button)`
+- `::part(status)`
 
-The component uses an internal button; target parts:
-
-- `::part(button)` — main button
-- `::part(status)` — status text
-
-Example:
-
-```css
-digital-credentials-button::part(button) {
-  background: #111827;
-  color: #f8fafc;
-}
-```
-
-## How it works
-
-1. Resolve a request payload: use `request-payload` if provided, otherwise GET `${request-endpoint}/${request-id}` (adds `request-id` query param).
-2. Calls `navigator.credentials.get` with the request payload.
-3. POSTs the DC API response to `response-endpoint` (with `request-id`).
-4. Emits lifecycle events for success/error at each stage.
-
-## Core reuse
-
-The component delegates the flow to `@waltid/dc-client`. If you prefer direct control (React hooks, Vue composables, SSR), depend on `@waltid/dc-client` and call `requestCredential` yourself.
+## Internals
+The component is a thin UI wrapper around `@waltid/dc-client`.

@@ -32,11 +32,19 @@
         calls <code>navigator.credentials.get</code>, and posts the result back.
       </p>
       <p style="margin-top: -6px; color: #475569;">
-        Endpoints are served from <code>/api/dc/request</code> and <code>/api/dc/response</code> by the in-repo demo backend.
+        Endpoints are served by the in-repo demo backend (OpenID4VP or ISO 18013-7 Annex C).
       </p>
 
       <section class="card" style="margin-bottom: 16px;">
         <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <label for="protocol-select"><strong>Retrieval</strong></label>
+          <select
+            id="protocol-select"
+            style="min-width: 240px; padding: 10px 12px; border-radius: 8px; border: 1px solid #e2e8f0;"
+          >
+            <option value="openid4vp">OpenID4VP (dc_api)</option>
+            <option value="annex-c">ISO 18013-7 Annex C (org.iso.mdoc)</option>
+          </select>
           <label for="request-select"><strong>Request</strong></label>
           <select
             id="request-select"
