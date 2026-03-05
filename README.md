@@ -1,4 +1,5 @@
 <div align="center">
+ <h1>Moved to: https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-digital-credentials </h1>
  <h1>Digital Credentials Button</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
  <p>A web component that fetches a digital credentials request, calls the Digital Credentials API, and posts the response to your backend.</p>
